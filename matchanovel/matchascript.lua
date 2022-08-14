@@ -210,6 +210,9 @@ local function get_next_line(line)
 	line = line or save.state.pos
 	local current_indention = get_indention(script[line])
 	local next_line = line + 1
+	if next_line > #script then 
+		return 1
+	end
 	local indention = get_indention(script[next_line])
 	while not indention or indention > current_indention do 
 		next_line = next_line + 1
@@ -408,6 +411,7 @@ function M.init()
 			execute_function(actions[k], arguments[k])
 		end
 	end
+	define = false
 end
 
 -- execute the action on the current line
@@ -441,6 +445,10 @@ end
 
 -- jump to line of given label and execute it
 function M.jump_to_label(label)
+	if label == "start" and not labels["start"] then 
+		M.jump_to_line(1)
+	end
+	
 	local line = labels[label]
 	if line then
 		M.jump_to_line(line)
@@ -497,7 +505,11 @@ end
 
 -- jump to line of given by label "start" and execute it 
 function M.start()
-	M.jump_to_label("start")
+	if labels["start"] then
+		M.jump_to_label("start")
+	else
+		M.jump_to_line(1)
+	end
 end
 
 local function add_line_to_script(line)

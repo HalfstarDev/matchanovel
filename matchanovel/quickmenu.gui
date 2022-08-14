@@ -1,19 +1,19 @@
 script: "/matchanovel/quickmenu.gui_script"
 fonts {
   name: "serif"
-  font: "/main/fonts/serif.font"
+  font: "/matchanovel/fonts/serif.font"
 }
 fonts {
   name: "sans"
-  font: "/main/fonts/sans.font"
+  font: "/matchanovel/fonts/sans.font"
 }
 fonts {
   name: "dyslexia"
-  font: "/main/fonts/dyslexia.font"
+  font: "/matchanovel/fonts/dyslexia.font"
 }
 textures {
   name: "atlas"
-  texture: "/main/atlas.atlas"
+  texture: "/matchanovel/atlas_matchanovel.atlas"
 }
 background_color {
   x: 0.0

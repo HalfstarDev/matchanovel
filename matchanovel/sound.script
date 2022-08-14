@@ -52,9 +52,8 @@ function init(self)
 	if volume_master then 
 		sound.set_group_gain(hash("master"), volume_master)
 	end
-	sound.set_group_gain(hash("bgm"), 1)
+	--sound.set_group_gain(hash("bgm"), 1)
 	--sound.set_group_gain(hash("sfx"), 1)
-	msg.post("#", "play_music", {id = "bgm"})
 end
 
 function on_message(self, message_id, message, sender)

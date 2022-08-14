@@ -245,9 +245,6 @@ function init(self)
 	name_scale = gui.get_scale(gui.get_node("name")).x
 	init_textbox()
 	typewriter.init("text")
-
-	matchanovel.init("/assets/scripts/script.txt")
-	matchanovel.start()
 end
 
 function update(self, dt)
