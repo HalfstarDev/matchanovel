@@ -1,0 +1,36 @@
+[bootstrap]
+main_collection = /matchanovel/example/main.collectionc
+
+[script]
+shared_state = 1
+
+[display]
+width = 960
+height = 540
+high_dpi = 1
+
+[android]
+input_method = HiddenInputField
+package = com.halfstaratelier.matchanovel
+
+[project]
+title = MatchaNovel
+version = 0.1
+custom_resources = matchanovel/example/assets
+bundle_resources = matchanovel/example/assets
+
+[sprite]
+max_count = 512
+
+[particle_fx]
+max_particle_count = 2048
+
+[gui]
+max_particle_count = 4096
+
+[html5]
+scale_mode = fit
+
+[library]
+include_dirs = matchanovel
+
