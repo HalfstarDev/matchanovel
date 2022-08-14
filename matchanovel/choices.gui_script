@@ -1,0 +1,125 @@
+local matchanovel = require "matchanovel.matchanovel"
+
+local distance = 64
+local border_x = 32
+local border_y = 16
+
+local active = false
+local pressed_choice = false
+local current_text = {}
+local nodes = {}
+
+
+
+local function get_text_size(node, text)
+	local font_resource = gui.get_font_resource(gui.get_font(node))
+	local metrics = resource.get_text_metrics(font_resource, text)
+	local text_scale = gui.get_scale(node)
+	local width = metrics.width * text_scale.x
+	local height = metrics.height * text_scale.y
+	return width, height
+end
+
+local function delete_choices()
+	for k, v in pairs(nodes) do
+		gui.delete_node(v[hash("choice")])
+	end
+	nodes = {}
+end
+
+local function hide_choices()
+	gui.set_enabled(gui.get_node("choices"), false)
+end
+
+local function unhide_choices()
+	gui.set_enabled(gui.get_node("choices"), true)
+end
+
+local function create_choices(choices)
+	delete_choices()
+	current_text = choices
+	local y = 0
+	for k, text in pairs(choices) do
+		nodes[k] = gui.clone_tree(gui.get_node("choice"))
+		local node_choice = nodes[k][hash("choice")]
+		local node_box = nodes[k][hash("choice_box")]
+		local node_text = nodes[k][hash("choice_text")]
+		local text_width, text_height = get_text_size(node_text, text)
+		
+		y = y - text_height/2 - border_y
+		gui.set_enabled(node_choice, true)
+		gui.set_text(node_text, text)
+		gui.set_size(node_box, vmath.vector3(text_width + 2*border_x, text_height + 2*border_y, 0))
+		gui.set_position(node_choice, vmath.vector3(0, y, 0))
+		y = y - text_height/2 - border_y - distance
+	end
+	y = y + border_y + distance
+	gui.set_position(gui.get_node("choices"), vmath.vector3(0, -y/2, 0))
+end
+
+local function pick_choices(choice)
+	active = false
+	matchanovel.choose(choice)
+	delete_choices()
+end
+
+local function set_font(font)
+	gui.set_font(gui.get_node("choice_text"), font)
+	if active then
+		delete_choices()
+		create_choices(current_text)
+	end
+end
+
+
+
+
+
+function init(self)
+	msg.post("window_listener#window_listener", "add_listener")
+end
+
+function update(self, dt)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("show_text_choices") then
+		local choices = {}
+		for k, v in pairs(message.text) do
+			choices[k] = v[0]
+		end
+		create_choices(choices)
+		active = true
+	elseif message_id == hash("set_font") then
+		set_font(message.font)
+	elseif message_id == hash("delete") then
+		delete_choices()
+	elseif message_id == hash("hide") then
+		hide_choices()
+	elseif message_id == hash("unhide") then
+		unhide_choices()
+	--elseif message_id == hash("event_window_resized") then 
+	elseif message_id == hash("loaded") then
+		unhide_choices()
+	end
+end
+
+function on_input(self, action_id, action)
+	if not active then return end
+
+	if not action_id then
+	elseif action_id == hash("touch") then 
+		if action.pressed then
+			for k, v in pairs(nodes) do
+				if gui.pick_node(v[hash("choice_box")], action.x, action.y) then
+					pressed_choice = k
+				end
+			end
+		elseif action.released then 
+			if pressed_choice and gui.pick_node(nodes[pressed_choice][hash("choice_box")], action.x, action.y) then 
+				pick_choices(pressed_choice)
+			end
+			pressed_choice = false
+		end
+	end
+end

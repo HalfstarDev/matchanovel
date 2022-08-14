@@ -1,0 +1,334 @@
+local matchanovel = require "matchanovel.matchanovel"
+local typewriter = require "matchanovel.typewriter"
+local settings = require "matchanovel.settings"
+local save = require "matchanovel.save"
+
+local display_width = tonumber(sys.get_config("display.width"))
+local display_height = tonumber(sys.get_config("display.height"))
+
+local alpha = 0.75
+local textbox_color_y = 1/3
+local textbox_gradient_y = 1/16
+local text_width = 2/3
+local text_height = 0.3
+local skipping = false
+local skip_t = 0
+local skip_per_second = 30
+local auto = false
+local auto_t = 0
+local log_position = false
+local textbox_visible = true
+local name_scale = 1
+local window_resized_zoom = 1
+--local showing_text = false
+
+
+local function init_textbox()
+	local node_color = gui.get_node("textbox_color")
+	local scale = gui.get_scale(gui.get_node("gui"))
+	local w = display_width / scale.x
+	local h = display_height / scale.y
+	
+	local size_color = vmath.vector3(math.floor(w), math.floor(h * textbox_color_y), 0)
+	gui.set_size(node_color, size_color)
+	gui.set_alpha(node_color, alpha)
+
+	local node_gradient = gui.get_node("textbox_gradient")
+	if textbox_gradient_y then 
+		gui.set_enabled(node_gradient, true)
+		gui.set_size(node_gradient, vmath.vector3(math.floor(w), math.floor(h * textbox_gradient_y), 0))
+		gui.set_position(node_gradient, vmath.vector3(0, size_color.y, 0))
+		gui.set_alpha(node_gradient, alpha)
+	else
+		gui.set_enabled(node_gradient, false)
+	end
+
+	local node_text = gui.get_node("text")
+	local width_border = (1 - text_width) / window_resized_zoom
+	local size = vmath.vector3(0, 0, 1)
+	size.x = w * (1 - width_border) 
+	size.y = h * text_height
+	local position = vmath.vector3(-size.x/2, size.y * window_resized_zoom, 0)
+	gui.set_size(node_text, size)
+	gui.set_position(node_text, position)
+end
+
+local function set_font(font)
+	gui.set_font(gui.get_node("text"), font)
+	gui.set_font(gui.get_node("name"), font)
+	typewriter.redraw()
+end
+
+local function continue()
+	save.set_global_read()
+	typewriter.next()
+end
+
+local function hide_name()
+	local node = gui.get_node("name")
+	gui.set_enabled(node, false)
+end
+
+local function show_name(name)
+	local node = gui.get_node("name")
+	gui.set_enabled(node, true)
+	gui.set_text(node, name)
+end
+
+local function say(text, name)
+	typewriter.start(text)
+	matchanovel.add_to_log(text, "Name")
+	if name then
+		name = save.get_var(name..".name") or tostring(name)
+	else
+		name = ""
+	end
+	show_name(name)
+end
+
+local function get_auto_duration()
+	return 2 + 8*(1 - settings.get("auto_speed")/100)
+end
+
+local function end_skip()
+	skipping = false
+	msg.post("quickmenu#quickmenu", "deactivate_button", {name = "skip"})
+	
+	local node = gui.get_node("auto")
+	gui.animate(node, "scale.y", 0, gui.EASING_INOUTSINE, 0.05)
+end
+
+local function end_auto()
+	auto = false
+	gui.set_fill_angle(gui.get_node("auto"), 0)
+	msg.post("quickmenu#quickmenu", "deactivate_button", {name = "auto"})
+end
+
+local function start_skip()
+	if auto then 
+		end_auto()
+	end
+	skipping = true
+	skip_t = 0
+	msg.post("quickmenu#quickmenu", "activate_button", {name = "skip"})
+
+	local node = gui.get_node("auto")
+	gui.set_fill_angle(node, 360)
+	gui.set_scale(node, vmath.vector3(1, 1, 1))
+	gui.animate(node, "scale.y", 0.0001, gui.EASING_INOUTSINE, 0.35, 0, nil, gui.PLAYBACK_LOOP_PINGPONG)
+end
+
+local function start_auto()
+	if skipping then 
+		end_skip()
+	end
+	auto = true
+	auto_t = 0
+	local node = gui.get_node("auto")
+	gui.set_fill_angle(node, 0)
+	gui.animate(node, "scale.y", 1, gui.EASING_INOUTSINE, 0.1)
+	msg.post("quickmenu#quickmenu", "activate_button", {name = "auto"})
+end
+
+local function toggle_skip()
+	if skipping then
+		end_skip()
+	else
+		start_skip()
+	end
+end
+
+local function toggle_auto()
+	if auto then
+		end_auto()
+	else
+		start_auto()
+	end
+end
+
+local function show()
+	gui.set_enabled(gui.get_node("textbox"), true)
+	textbox_visible = true
+end
+
+local function hide()
+	gui.set_enabled(gui.get_node("textbox"), false)
+	textbox_visible = false
+end
+
+local function set_log(line)
+	local text = matchanovel.get_log(line)
+	typewriter.set_instant_text(text)
+end
+
+local function show_log()
+	if not textbox_visible then
+		gui.set_enabled(gui.get_node("textbox"), true)
+	end
+	msg.post("choices#choices", "hide")
+end
+
+local function hide_log()
+	log_position = false
+	if not textbox_visible then
+		gui.set_enabled(gui.get_node("textbox"), false)
+	end
+	msg.post("choices#choices", "unhide")
+	typewriter.hide_instant_text()
+end
+
+local function press_continue()
+	if log_position then 
+		hide_log()
+	elseif skipping then
+		end_skip()
+	elseif auto then
+		end_auto()
+	else
+		continue()
+	end
+end
+
+local function back()
+	if log_position then
+		log_position = log_position - 1
+		if log_position < 1 then
+			log_position = 1
+			return
+		end
+	else
+		log_position = matchanovel.get_log_size() - 1
+		if not log_position or log_position < 1 then
+			return
+		else
+			show_log()
+		end 
+	end
+	set_log(log_position)
+end
+
+local function forward()
+	if log_position then
+		log_position = log_position + 1
+		local n = matchanovel.get_log_size()
+		if log_position >= n then
+			log_position = n
+			hide_log()
+		else
+			set_log(log_position)
+		end
+	else
+		press_continue()
+	end
+end
+
+
+local function resize_window()
+	init_textbox()
+	--gui.set_position(gui.get_node("text"), vmath.vector3(-622, 326 * window_resized_zoom, 0))
+	gui.set_position(gui.get_node("name"), vmath.vector3(-700, 446 * window_resized_zoom, 0))
+	local text_zoom = 1 + (window_resized_zoom - 1) / 2
+	gui.set_scale(gui.get_node("name"), vmath.vector3(text_zoom * name_scale, text_zoom * name_scale, 1))
+	typewriter.set_scale(text_zoom)
+	typewriter.redraw()
+end
+
+
+
+
+
+function init(self)
+	gui.set_render_order(8)
+	msg.post("window_listener#window_listener", "add_listener")
+
+	gui.set_text(gui.get_node("text"), "")
+	name_scale = gui.get_scale(gui.get_node("name")).x
+	init_textbox()
+	typewriter.init("text")
+
+	matchanovel.init("/assets/scripts/script.txt")
+	matchanovel.start()
+end
+
+function update(self, dt)
+	if skipping then
+		skip_t = skip_t + dt
+		if skip_t >= 1/skip_per_second then
+			if settings.get("skip_all") or save.get_global_read(line) then
+				continue()
+				skip_t = 0
+			else
+				end_skip()
+			end
+		end
+	elseif auto then
+		local auto_duration = get_auto_duration()
+		auto_t = auto_t + dt
+		if auto_t >= auto_duration then
+			gui.set_fill_angle(gui.get_node("auto"), 360)
+			if typewriter.get_state() == "waiting" then
+				continue()
+				auto_t = 0
+			end
+		else
+			local angle = 360 * auto_t / auto_duration
+			angle = math.min(angle, 360)
+			gui.set_fill_angle(gui.get_node("auto"), angle)
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("say") then
+		show()
+		say(message.text, message.name)
+	elseif message_id == hash("typewriter_next") then 
+		matchanovel.textbox_done()
+	elseif message_id == hash("set_font") then 
+		set_font(message.font)
+	elseif message_id == hash("event_window_resized") then 
+		window_resized_zoom = message.zoom
+		resize_window()
+	elseif message_id == hash("skip_button") then
+		toggle_skip()
+	elseif message_id == hash("auto_button") then
+		toggle_auto()
+	elseif message_id == hash("set_textspeed") then
+		local textspeed
+		if message.value > 0.999 then
+			textspeed = 10000
+		elseif message.value > 0.75 then
+			textspeed = 100 + (message.value - 0.8) * 240
+		else
+			textspeed = 10 + message.value * 120
+		end
+		typewriter.set_options({textspeed = textspeed})
+	elseif message_id == hash("hide") then
+		hide()
+	elseif message_id == hash("loaded") then
+		hide_log()
+	end	
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("continue") and action.pressed then 
+		press_continue()
+	elseif action_id == hash("touch") then
+		if action.pressed then 
+		elseif action.released then
+			press_continue()
+		end
+	elseif action_id == hash("skip") then
+		if action.pressed then
+			start_skip()
+		elseif action.released then
+			end_skip()
+		end
+	elseif action_id == hash("toggle_skip") and action.pressed then
+		toggle_skip()
+	elseif action_id == hash("back") and action.repeated then
+		back()
+	elseif action_id == hash("forward") and action.repeated then
+		forward()
+	end
+end
