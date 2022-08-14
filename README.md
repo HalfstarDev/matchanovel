@@ -1,9 +1,13 @@
-# matchanovel
+# MatchaNovel
 A visual novel engine for Defold and other Lua based engines.
 
 (This is an early preview, and does not contain a full documentation yet. I will update the manual and add missing features step by step.)
 
-MatchaNovel is an open-source visual novel framework to create narrative games with the Defold engine, or another Lua based engine.
+For an example, try the web demo: https://halfstar.itch.io/matchanovel
+
+## What is MatchaNovel?
+
+MatchaNovel is an open-source visual novel engine to create narrative games with the Defold engine, or another Lua based engine.
 
 It consists of these parts:
 
@@ -15,7 +19,7 @@ Currently working fully on these platforms: Windows, Linux, macOS, Android, HTML
 
 Platforms it can export to, but I could not test yet without a devkit: iOS and Nintendo Switch
 
-Some key features:
+## Some key features:
 
 - writer friendly scripting language
 - you can make a full release with only MatchaScript code, or you can use Defold to edit the GUI and scenes in a WYSIWYG editor
