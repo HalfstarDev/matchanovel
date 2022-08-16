@@ -11,13 +11,13 @@ MatchaNovel is an open-source visual novel engine to create narrative games with
 
 It consists of these parts:
 
-MatchaScript: a Lua based scripting language for narrative works, that can be imported into an engine
+- **MatchaScript:** a Lua based scripting language for narrative works, that can be imported into an engine
 
-MatchaNovel: a Lua backend for visual novels that extends MatchaScript, and allows renpy-like scripting
+- **MatchaNovel:** a Lua backend for visual novels that extends MatchaScript, and allows renpy-like scripting
 
-MatchaNovel for Defold: a library and GUI for the open source 2D+3D game engine Defold
+- **MatchaNovel for Defold:** a library and GUI for the open source 2D+3D game engine Defold
 
-Jasmine: my textbox library for Defold
+- **Jasmine:** my textbox library for Defold
 
 Currently working fully on these platforms: Windows, Linux, macOS, Android, HTML5
 
