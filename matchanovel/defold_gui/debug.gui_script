@@ -1,0 +1,44 @@
+local save = require "matchanovel.save"
+
+local framerates_wait = 60
+
+local active = false
+local active_on_debug = false
+local active_on_release = false
+local framerates = {}
+
+
+
+function init(self)
+	gui.set_render_order(15)
+	active = sys.get_engine_info().is_debug
+	local var_debug = save.get_var("debug")
+	if not active_on_debug or (not active and not active_on_release) then
+		gui.set_enabled(gui.get_node("debug"), false)
+	end
+end
+
+function update(self, dt)
+	if dt > 0 then 
+		table.insert(framerates, 1/dt)
+		if #framerates > framerates_wait then
+			local fps = 0
+			for _, v in pairs(framerates) do
+				fps = fps + v
+			end
+			fps = fps / #framerates
+			gui.set_text(gui.get_node("fps"), math.floor(fps))
+			framerates = {}
+		end
+	end
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_render_order") then
+		gui.set_render_order(message.n)
+	end
+end
+
+function on_input(self, action_id, action)
+	--    msg.post(".", "acquire_input_focus")
+end

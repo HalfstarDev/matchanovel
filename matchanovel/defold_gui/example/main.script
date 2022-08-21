@@ -1,0 +1,6 @@
+local matchanovel = require "matchanovel.matchanovel"
+
+function init(self)
+	matchanovel.init("/matchanovel/defold_gui/example/assets/helloworld.txt")
+	matchanovel.start()
+end

@@ -1,0 +1,244 @@
+local save = require "matchanovel.save"
+local colors = require "matchanovel.colors"
+local images = require "matchanovel.defold_gui.images"
+
+
+
+local display_width = tonumber(sys.get_config("display.width"))
+local display_height = tonumber(sys.get_config("display.height"))
+
+local v3 = vmath.vector3
+
+local sprites = {}
+local loaded_textures = {}
+
+
+
+local function get_key(val, tab)
+	for k, v in pairs(tab) do
+		if val == v then 
+			return k
+		end
+	end
+end
+
+local function get_screen_position(v)
+	local gui_scale = gui.get_scale(gui.get_node("gui"))
+	local pos_x = (v.x - 0.5) * display_width / gui_scale.x
+	local pos_y = (v.y - 0.5) * display_height / gui_scale.y
+	return v3(pos_x, pos_y, 0)
+end
+
+local function get_position_from_variable(var)
+	local x = save.get_var(var..".x") or 0.5
+	local y = save.get_var(var..".y") or 0.5
+	return v3(x, y, 0)
+end
+
+
+
+local function set_sprite(name, spr)
+	local node = sprites[name]
+	if node and spr then 
+		local first = string.sub(spr, 1, 1)
+		local filepath
+		if first == "/" or first == "." then
+			filepath = spr
+		else
+			filepath = "/assets/images/sprites/"..spr
+		end
+		images.set_gui_sprite(loaded_textures, node, filepath)
+	end
+end
+
+local function get_character_delta_position(name)
+	local x = save.get_var(name..".x") or 0
+	local y = save.get_var(name..".y") or 0
+	return v3(x, y, 0)
+end
+
+local function show(name, at, transition, duration)
+	if not sprites[name] then 
+		sprites[name] = gui.clone(gui.get_node("sprite"))
+	end
+
+	local node = sprites[name]
+	local gui_scale = gui.get_scale(gui.get_node("gui")).x
+	local spr = save.get_var(name..".sprite")
+	local spine_node = save.get_var(name..".spine")
+	local scale = save.get_var(name..".scale") or 1
+	local character_pos = get_character_delta_position(name)
+	local at_pos = v3()
+	if at then 
+		local at_id = save.get_var(name..".at")
+		if at_id then
+			at_pos.x = save.get_var(at_id..".x") or 0.5
+			at_pos.y = save.get_var(at_id..".y") or 0
+		else
+			at_pos.x = 0.5
+			at_pos.y = 0
+		end
+	else
+		at_pos.x = 0.5
+		at_pos.y = 0
+	end
+	local position = get_screen_position(character_pos + at_pos)
+	
+	transition = transition or save.get_var("show.transition")
+	duration = duration or save.get_var("show.duration")
+
+	if spr then
+		set_sprite(name, spr)
+		gui.move_below(node, gui.get_node("front"))
+	end
+	
+	if spine_node then
+		--sprites[name]
+		local clone = gui.clone(gui.get_node(spine_node))
+		gui.set_enabled(clone, true)
+		gui.set_parent(clone, node, false)
+		gui.move_below(node, gui.get_node("front"))
+	end
+	
+	if position then 
+		gui.set_position(node, position)
+	end
+	
+	if scale then 
+		gui.set_scale(node, v3(scale, scale, 1))
+	end
+	
+	if transition then
+		if transition == "instant" then 
+			gui.set_alpha(node, 1)
+		elseif transition == "fade" then
+			duration = duration or 0.4
+			gui.set_alpha(node, 0)
+			gui.animate(node, "color.w", 1, gui.EASING_INOUTSINE, duration)
+		elseif transition == "move_up" then
+			duration = duration or 0.8
+			local start_position = v3(x, y - display_height / gui_scale, 0)
+			gui.set_position(node, start_position)
+			gui.animate(node, "position", position, gui.EASING_INOUTSINE, duration)
+			gui.set_alpha(node, 1)
+		elseif transition == "grow" then
+			duration = duration or 0.6
+			gui.set_alpha(node, 1)
+			gui.set_scale(node, v3(0.0001, 0.0001, 1))
+			gui.animate(node, "scale", scale, gui.EASING_INOUTSINE, duration)
+		end
+	else 
+		gui.set_alpha(node, 1)
+	end
+	
+	save.state.sprites[name] = true
+end
+
+
+local function hidden(self, node)
+	if node then
+		gui.delete_node(node)
+	end
+end
+
+
+local function hide(name, to, transition, duration)
+	local node = sprites[name]
+	transition = transition or save.get_var("show.transition")
+	duration = duration or save.get_var("show.duration")
+	local gui_scale = gui.get_scale(gui.get_node("gui")).x
+	
+	if node then
+		if transition then
+			local done = hidden
+			local x = gui.get_position(node).x
+			local y = gui.get_position(node).y
+			if transition == "instant" then 
+				done(_, node)
+			elseif transition == "fade" then
+				duration = duration or 0.4
+				gui.animate(node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, done)
+			elseif transition == "move_down" then
+				duration = duration or 0.8
+				--local to_position = to or v3(x, y - display_height / gui_scale, 0)
+				local to_position = v3(x, y - display_height / gui_scale, 0)
+				gui.animate(node, "position", to_position, gui.EASING_INOUTSINE, duration, 0, done)
+			elseif transition == "shrink" then
+				duration = duration or 0.6
+				gui.animate(node, "scale", v3(0.0001, 0.0001, 1), gui.EASING_INOUTSINE, duration, 0, done)
+			end
+		elseif to then 
+			local pos_to = get_position_from_variable(to) or v3()
+			local pos = get_screen_position(gui.get_position(node) + pos_to)
+			local done = hidden
+			if pos then
+				duration = duration or 0.5
+				gui.animate(node, "position", pos, gui.EASING_INOUTSINE, duration, 0, done)
+			end
+		else 
+			done(_, node)
+		end
+	end
+	
+	sprites[name] = nil
+	save.state.sprites[name] = nil
+end
+
+local function move(name, to, duration)
+	local node = sprites[name]
+	duration = duration or save.get_var("move.duration") or 0.5
+	local character_pos = get_character_delta_position(name) or v3()
+	local to_pos = get_position_from_variable(to) or v3()
+	local position = get_screen_position(character_pos + to_pos)
+	--+ v3(x, y, 0)
+	if node and to_pos then
+		gui.animate(node, "position", position, gui.EASING_INOUTSINE, duration)
+	end
+end
+
+
+local function unload_all()
+	for k, node in pairs(sprites) do
+		gui.delete_node(node)
+	end
+	sprites = {}
+end
+
+
+
+
+
+function init(self)
+	msg.post("window_listener#window_listener", "add_listener")
+end
+
+function update(self, dt)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("show") then 
+		show(message.name, message.at, message.transition, message.duration)
+	elseif message_id == hash("hide") then
+		hide(message.name, message.to, message.transition, message.duration)
+	elseif message_id == hash("move") then 
+		move(message.name, message.to, message.duration)
+	elseif message_id == hash("set_sprite") then 
+		set_sprite(message.name, message.spr)
+	elseif message_id == hash("action_set_sprite") then 
+		set_sprite(message.name, message.spr)
+	elseif message_id == hash("move_to_front") then 
+	elseif message_id == hash("move_to_back") then 
+	elseif message_id == hash("set_render_order") then 
+		gui.set_render_order(message.n)
+	elseif message_id == hash("event_window_resized") then 
+		gui.set_scale(gui.get_node("center"), v3(message.zoom_fit, message.zoom_fit, 0))
+	elseif message_id == hash("loaded") then 
+		unload_all()
+		if save.state.sprites then
+			for name, _ in pairs(save.state.sprites) do
+				show(name)
+			end
+		end
+	end
+end
+

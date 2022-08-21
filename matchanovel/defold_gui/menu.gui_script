@@ -1,0 +1,579 @@
+local matchanovel = require "matchanovel.matchanovel"
+local settings = require "matchanovel.settings"
+local save = require "matchanovel.save"
+
+
+local HASH_TOUCH = hash("touch")
+local HASH_MENU = hash("menu")
+local HASH_BACK = hash("back")
+local HASH_FORWARD = hash("forward")
+
+local save_slots_per_page = 4
+local save_page_max = 9
+
+local active = false
+local active_menu = false
+
+local pressed = false
+local pressed_slider = false
+local pressed_slider_arrow = false
+local pressed_option = false
+
+local save_hovered = false
+local pressed_save = false
+local save_page = 1
+local save_written = {}
+
+
+
+local sliders = {
+	"text_speed",
+	"auto_speed",
+	"volume_music",
+	"volume_sound",
+}
+
+--[[
+local options = {}
+options[1] = {
+	"serif",
+	"sans",
+	"dyslexia",
+}
+options[2] = {
+	"skip_all",
+	"skip_read",
+}
+options[3] = {
+	"fullscreen",
+	"window",
+}
+--]]
+
+local option_names = {"font", "skip_all", "fullscreen"}
+
+local options = {}
+options.font = {"serif", "sans", "dyslexia"}
+options.skip_all = {false, true}
+options.fullscreen = {true, false}
+
+
+local slider_value = {0.5, 0.5, 0.5, 0.5}
+local picked_option = {0, 0, 0}
+
+local function show_menu()
+	local node_menu = gui.get_node("menu")
+	gui.set_enabled(node_menu, true)
+	gui.animate(node_menu, "scale.x", 1, gui.EASING_INOUTSINE, 0.2)
+	gui.animate(node_menu, "color.w", 1, gui.EASING_INOUTSINE, 0.2)
+	active = true
+	matchanovel.showing_menu = true
+end
+
+local function menu_hidden()
+	gui.set_enabled(gui.get_node("menu"), false)
+	gui.set_enabled(gui.get_node("settings"), false)
+end
+
+local function hide_menu()
+	local node_menu = gui.get_node("menu")
+	gui.animate(node_menu, "scale.x", 0.5, gui.EASING_INOUTSINE, 0.2)
+	gui.animate(node_menu, "color.w", 0, gui.EASING_INOUTSINE, 0.2, 0, menu_hidden)
+	active = false
+	active_menu = false
+	matchanovel.showing_menu = false
+end
+
+local function show_settings()
+	active_menu = "settings"
+	gui.set_enabled(gui.get_node("settings"), true)
+	gui.set_enabled(gui.get_node("save"), false)
+	show_menu()
+end
+
+local function show_save()
+	active_menu = "save"
+	gui.set_enabled(gui.get_node("save"), true)
+	gui.set_enabled(gui.get_node("settings"), false)
+	gui.set_text(gui.get_node("save_title_text"), "Save")
+	show_menu()
+end
+
+local function show_load()
+	active_menu = "load"
+	gui.set_enabled(gui.get_node("save"), true)
+	gui.set_enabled(gui.get_node("settings"), false)
+	gui.set_text(gui.get_node("save_title_text"), "Load")
+	show_menu()
+end
+
+
+
+
+local function apply_slider(name, value)
+	settings.set(name, math.floor(value*100 + 0.5))
+	if name == "text_speed" then
+		msg.post("textbox#textbox", "set_textspeed", {value = value})
+	elseif name == "auto_speed" then
+		msg.post("textbox#textbox", "set_autospeed", {value = value})
+	elseif name == "volume_music" then
+		msg.post("sound#sound", "set_volume_bgm", {volume = value})
+	elseif name == "volume_sound" then
+		msg.post("sound#sound", "set_volume_sfx", {volume = value})
+	end
+end
+
+local function set_slider_value(slider, value, animate)
+	slider_value[slider] = value
+	local node = gui.get_node("slider_empty_"..slider)
+	local node_full = gui.get_node("slider_full_"..slider)
+	local size = gui.get_size(node)
+	size.x = size.x * value
+	if animate then 
+		gui.animate(node_full, "size.x", size.x, gui.EASING_INOUTSINE, 0.15)
+	else
+		gui.set_size(node_full, size)
+	end
+	apply_slider(sliders[slider], value)
+end
+
+
+local function set_slider(slider, screen_x)
+	local node = gui.get_node("slider_empty_"..slider)
+	local node_min = gui.get_node("arrow_left_"..slider)
+	local node_max = gui.get_node("arrow_right_"..slider)
+	local node_full = gui.get_node("slider_full_"..slider)
+
+	local size = gui.get_size(node)
+	local screen_x_min = gui.get_screen_position(node_min).x
+	local screen_x_max = gui.get_screen_position(node_max).x
+
+	local value = (screen_x - screen_x_min) / (screen_x_max - screen_x_min)
+	if value < 0 then value = 0 end
+	if value > 1 then value = 1 end 
+	
+	set_slider_value(slider, value)
+
+	--msg.post("sound#sound", "set_volume", {volume = value})
+end
+
+local text_nodes = {
+	"title_text",
+	"box_okay_text",
+	"slider_name_1",
+	"slider_name_2",
+	"slider_name_3",
+	"slider_name_4",
+	"button_2_1",
+	"button_2_2",
+	"button_3_1",
+	"button_3_2",
+}
+
+local function set_font(font)
+	for _, id in pairs(text_nodes) do
+		gui.set_font(gui.get_node(id), font)
+	end
+	if font == "dyslexia" then 
+		gui.set_leading(gui.get_node("slider_name_1"), 0.5)
+		gui.set_leading(gui.get_node("slider_name_2"), 0.5)
+	else
+		gui.set_leading(gui.get_node("slider_name_1"), 0.65)
+		gui.set_leading(gui.get_node("slider_name_2"), 0.65)
+	end
+	msg.post("textbox#textbox", "set_font", {font = font})
+	msg.post("quickmenu#quickmenu", "set_font", {font = font})
+	msg.post("choices#choices", "set_font", {font = font})
+end
+
+local function enable_fullscreen()
+	if defos then 
+		defos.set_fullscreen(true)
+	end
+end
+
+local function disable_fullscreen()
+	if defos then 
+		defos.set_fullscreen(false)
+	end
+end
+
+local function apply_option(name, value)
+	settings.set(name, value)
+	if name == "fullscreen" then 
+		if value then
+			enable_fullscreen()
+		else
+			disable_fullscreen()
+		end
+		pressed_option = false
+	elseif name == "font" then 
+		set_font(value)
+	elseif name == "skip_all" then
+		msg.post("textbox#textbox", "set_skip_all", {value = value})
+	end
+end
+
+local function pick_option(group, option)
+	if not group or group <= 0 or picked_option[group] == option then return end
+	
+	local node_option = gui.get_node("button_"..group.."_"..option)
+	local node_slide = gui.get_node("options_slide_"..group)
+	
+	local x = gui.get_position(node_option).x
+	gui.animate(node_slide, "position.x", x, gui.EASING_INOUTSINE, 0.2)
+
+	local font_resource = gui.get_font_resource(gui.get_font(node_option))
+	local metrics = resource.get_text_metrics(font_resource, gui.get_text(node_option))
+	local width = (metrics.width * gui.get_scale(node_option).x + 48) / 1.41421
+	local size = vmath.vector3(width, width, 1)
+	gui.animate(node_slide, "size", size, gui.EASING_INOUTSINE, 0.2)
+
+	picked_option[group] = option
+	local name = option_names[group]
+	local value = options[name][option]
+	apply_option(name, value)
+end
+
+local function toggle_fullscreen()
+	if defos.is_fullscreen() then
+		pick_option(3, 2)
+	else 
+		pick_option(3, 1)
+	end
+end
+
+local function slider_plus(slider)
+	local step = 0.05
+	local value = slider_value[slider] + step
+	if value > 1 then value = 1 end
+	set_slider_value(slider, value, true)
+end
+
+local function slider_minus(slider)
+	local step = 0.05
+	local value = slider_value[slider] - step
+	if value < 0 then value = 0 end
+	set_slider_value(slider, value, true)
+end
+
+local function get_slot_number(page_slot)
+	return page_slot + (save_page - 1) * save_slots_per_page
+end
+
+local function show_slot_as_written(page_slot, text)
+	save_written[page_slot] = true
+	local slot = get_slot_number(page_slot)
+	text = text or save.get_text(slot, false, false)
+	if text then
+		gui.set_text(gui.get_node("save_text_"..page_slot), text) --"2022-08-09\n00:38:12"
+	end
+	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
+end
+
+local function show_slot_as_empty(page_slot)
+	save_written[page_slot] = false
+	gui.set_text(gui.get_node("save_text_"..page_slot), "empty")
+	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.4, gui.EASING_INOUTSINE, 0.25)
+end
+
+local function write_save(page_slot)
+	show_slot_as_written(page_slot, save.get_current_text())
+	local slot = get_slot_number(page_slot)
+	matchanovel.write_save(slot, false, false)
+end
+
+local function load_save(page_slot)
+	if not save_written[page_slot] then return end
+	
+	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
+	local slot = get_slot_number(page_slot)
+	matchanovel.load_save(slot, false, false)
+end
+
+local function update_save_page()
+	gui.set_text(gui.get_node("save_page_number"), save_page)
+	for i = 1, save_slots_per_page do
+		local slot = get_slot_number(i)
+		gui.set_text(gui.get_node("save_number_"..i), slot)
+		if save.is_used(slot) then 
+			show_slot_as_written(i)
+		else
+			show_slot_as_empty(i)
+		end
+	end
+end
+
+local function save_page_forward()
+	save_page = save_page + 1
+	if save_page > save_page_max then 
+		save_page = 1
+	end
+	update_save_page()
+end
+
+local function save_page_back()
+	save_page = save_page - 1
+	if save_page <= 0 then 
+		save_page = save_page_max
+	end
+	update_save_page()
+end
+
+local function load_settings()
+	local text_speed = settings.get("text_speed")
+	local auto_speed = settings.get("auto_speed")
+	local volume_music = settings.get("volume_music")
+	local volume_sound = settings.get("volume_sound")
+	local font = settings.get("font")
+	local fullscreen = settings.get("fullscreen")
+	local skip_all = settings.get("skip_all")	
+
+	set_slider_value(1, text_speed/100, false)
+	set_slider_value(2, auto_speed/100, false)
+	set_slider_value(3, volume_music/100, false)
+	set_slider_value(4, volume_sound/100, false)
+	for i, option_name in pairs(option_names) do
+		local loaded_option = settings.get(option_name)
+		for j, option in pairs(options[option_name]) do
+			if option == loaded_option then
+				pick_option(i, j)
+			end
+		end
+	end
+end
+
+
+
+
+
+function init(self)
+	msg.post("window_listener#window_listener", "add_listener")
+	gui.set_enabled(gui.get_node("menu"), false)
+	gui.set_enabled(gui.get_node("settings"), false)
+	gui.set_scale(gui.get_node("menu"), vmath.vector3(0.5, 1, 1))
+	gui.set_alpha(gui.get_node("menu"), 0)
+
+	--update_save_page()
+	--load_settings()
+end
+
+function update(self, dt)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("show_settings") then
+		show_settings()
+	elseif message_id == hash("hide_menu") then 
+		hide_menu()
+	elseif message_id == hash("show_save") then 
+		show_save()
+	elseif message_id == hash("show_load") then 
+		show_load()
+	elseif message_id == hash("init") then
+		update_save_page()
+		load_settings()
+	elseif message_id == hash("set_render_order") then 
+		gui.set_render_order(message.n)
+	elseif message_id == hash("event_window_resized") then 
+		gui.set_scale(gui.get_node("zoom"), vmath.vector3(message.zoom_fit, message.zoom_fit, 1))
+		gui.set_scale(gui.get_node("menu_back"), vmath.vector3(1, message.zoom_fit, 1))
+	end
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("fullscreen") and action.pressed then
+		toggle_fullscreen()
+		--pick_option(group, option)
+	end
+	
+	if active then
+		if action_id == HASH_MENU and action.pressed then
+			hide_menu()
+		end
+		
+		if active_menu == "settings" then
+			if action_id == HASH_TOUCH then
+				if action.pressed then
+					if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+						for i = 1, #sliders do
+							if gui.pick_node(gui.get_node("slider_empty_"..i), action.x, action.y) then
+								pressed_slider = i
+								break
+							end
+							if gui.pick_node(gui.get_node("arrow_left_"..i), action.x, action.y) then
+								pressed_slider_arrow = i
+								slider_minus(i)
+								break
+							end
+							if gui.pick_node(gui.get_node("arrow_right_"..i), action.x, action.y) then
+								pressed_slider_arrow = i
+								slider_plus(i)
+								break
+							end
+						end
+						for k, v in pairs(option_names) do
+							for i = 1, #options[v] do
+								if gui.pick_node(gui.get_node("button_"..k.."_"..i), action.x, action.y) then
+									pick_option(k, i)
+									pressed_option = k
+									break
+								end
+							end
+						end
+						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then 
+							pressed = "okay"
+						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then 
+							pressed = "okay"
+						end
+
+					else
+						pressed = "outside_menu"
+					end
+				elseif action.repeated then
+					if pressed_slider_arrow then 
+						if gui.pick_node(gui.get_node("arrow_left_"..pressed_slider_arrow), action.x, action.y) then
+							slider_minus(pressed_slider_arrow)
+						elseif gui.pick_node(gui.get_node("arrow_right_"..pressed_slider_arrow), action.x, action.y) then
+							slider_plus(pressed_slider_arrow)
+						end
+					end
+				elseif action.released then
+					if pressed and pressed == "outside_menu" then 
+						if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+							--hide_menu()
+							msg.post("#", "hide_menu")
+						end
+					elseif pressed and pressed == "okay" then 
+						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then
+							hide_menu()
+						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then
+							hide_menu()
+						end
+					end
+					pressed = false
+					pressed_slider = false
+					pressed_option = false
+					pressed_slider_arrow = false
+				else
+					if pressed_slider then
+						set_slider(pressed_slider, action.screen_x)
+					elseif pressed_option then
+						local name = option_names[pressed_option]
+						for i = 1, #options[name] do
+							if gui.pick_node(gui.get_node("button_"..pressed_option.."_"..i), action.x, action.y) then
+								pick_option(pressed_option, i)
+								break
+							end
+						end
+					end
+				end
+			end
+		elseif active_menu == "save" or active_menu == "load" then 
+			if not action_id then
+				if save_hovered then
+					local node = gui.get_node("save_"..save_hovered)
+					if not gui.pick_node(node, action.x, action.y) then
+						local alpha = 0.3
+						if save_written[save_hovered] then 
+							alpha = 0.75
+						end
+						gui.animate(node, "color.w", alpha, gui.EASING_INOUTSINE, 0.25)
+						save_hovered = false
+					end 
+				end
+				if not save_hovered and not pressed_save then
+					for i = 1, 4 do
+						local node = gui.get_node("save_"..i)
+						if gui.pick_node(node, action.x, action.y) then
+							save_hovered = i
+							local alpha = 0.8
+							if save_written[i] then 
+								alpha = 0.95
+							end
+							gui.animate(node, "color.w", alpha, gui.EASING_INOUTSINE, 0.25)
+						end
+					end
+				end
+			elseif action_id == HASH_TOUCH then
+				if action.pressed then
+					if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+						for i = 1, 4 do
+							local node = gui.get_node("save_"..i)
+							if gui.pick_node(node, action.x, action.y) then
+								pressed_save = i
+								gui.animate(node, "scale", vmath.vector3(0.8, 0.8, 1), gui.EASING_INOUTSINE, 0.15)
+							end
+						end
+						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then 
+							pressed = "okay"
+						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then 
+							pressed = "okay"
+						elseif gui.pick_node(gui.get_node("page_right"), action.x, action.y) then 
+							pressed = "page_right"
+						elseif gui.pick_node(gui.get_node("page_left"), action.x, action.y) then 
+							pressed = "page_left"							
+						end
+					else
+						pressed = "outside_menu"
+					end
+				elseif action.released then
+					if pressed_save then 
+						local node = gui.get_node("save_"..pressed_save)
+						if gui.pick_node(node, action.x, action.y) then
+							if active_menu == "save" then
+								write_save(pressed_save)
+							else
+								load_save(pressed_save)
+							end
+						end
+						gui.animate(node, "scale", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.25)
+					elseif pressed then
+						if pressed == "outside_menu" then 
+							if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+								msg.post("#", "hide_menu")
+							end
+						elseif pressed == "okay" then 
+							if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then
+								hide_menu()
+							elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then
+								hide_menu()
+							end
+						elseif pressed == "page_right" then
+							if gui.pick_node(gui.get_node("page_right"), action.x, action.y) then
+								save_page_forward()
+							end
+						elseif pressed == "page_left" then
+							if gui.pick_node(gui.get_node("page_left"), action.x, action.y) then
+								save_page_back()
+							end
+						end
+					end
+					pressed = false
+					pressed_slider = false
+					pressed_option = false
+					pressed_slider_arrow = false
+					pressed_save = false
+				end
+			elseif action_id == HASH_BACK then
+				if action.repeated then
+					save_page_back()
+				end
+			elseif action_id == HASH_FORWARD then
+				if action.repeated then
+					save_page_forward()
+				end
+			end
+		end
+			
+		
+		return true
+	else
+		if action_id == HASH_MENU and action.pressed then
+			show_settings()
+			--show_save()
+		end
+	end
+
+	
+end

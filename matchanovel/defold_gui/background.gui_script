@@ -1,0 +1,281 @@
+local save = require "matchanovel.save"
+local colors = require "matchanovel.colors"
+local images = require "matchanovel.defold_gui.images"
+
+
+
+local display_width = tonumber(sys.get_config("display.width"))
+local display_height = tonumber(sys.get_config("display.height"))
+
+local loaded_textures = {}
+
+local current_node
+local old_node
+
+
+local function delete_node(_, node)
+	if node then
+		if node == old_node then 
+			old_node = false
+		end
+		if node == current_node then 
+			current_node = false
+		end
+		gui.delete_node(node)
+	end
+end
+
+local function set_scene_color(color)
+	gui.set_color(current_node, color)
+end
+
+local function create_image_scene(image_name)
+	local first = string.sub(image_name, 1, 1)
+	local filepath
+	if first == "/" or first == "." then
+		filepath = image_name
+	else
+		filepath = "/assets/images/background/"..image_name
+	end
+	images.set_gui_sprite(loaded_textures, current_node, filepath)
+end
+
+local function get_color(name)
+	return colors.get_color(name)
+end
+
+local function create_new_scene(scene, color)
+	delete_node(_, old_node)
+	old_node = current_node
+	current_node = gui.clone(gui.get_node("background"))
+	gui.set_enabled(current_node, true)
+	gui.set_alpha(current_node, 1)
+	
+	local scene_name_color = get_color(scene)
+	if scene_name_color then
+		set_scene_color(scene_name_color)
+	else
+		create_image_scene(scene)
+	end
+	if color then
+		local tint_color = get_color(color)
+		if tint_color then
+			set_scene_color(tint_color)
+		end
+	end
+end
+
+local function transition_instant()
+	delete_node(_, old_node)
+end
+
+local function transition_fade(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, delete_node)
+end
+
+local function transition_fade_to_black(duration, transition_color)
+	duration = duration or 1
+	local color = vmath.vector4(0, 0, 0, 1)
+	if transition_color then
+		color = colors.get_color(transition_color) or color
+	end
+	
+	color_node = gui.clone(gui.get_node("background"))
+	gui.set_enabled(color_node, true)
+	gui.set_alpha(color_node, 1)
+	gui.set_color(color_node, color)
+	gui.move_above(color_node, current_node)
+
+	gui.animate(old_node, "color.w", 0, gui.EASING_INOUTSINE, duration/2, 0, delete_node)
+	gui.animate(color_node, "color.w", 0, gui.EASING_INOUTSINE, duration/2, duration/2, delete_node)
+end
+
+local function transition_shrink(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", vmath.vector3(0.0001, 0.0001, 1), gui.EASING_INOUTSINE, duration, 0, delete_node)
+end
+
+local function transition_grow(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", gui.get_scale(old_node), gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.move_above(current_node, old_node)
+	gui.set_scale(current_node, vmath.vector3(0.0001, 0.0001, 1))
+	gui.animate(current_node, "scale", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_grow_horizontal(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", gui.get_scale(old_node), gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.move_above(current_node, old_node)
+	gui.set_scale(current_node, vmath.vector3(0.0001, 1, 1))
+	gui.animate(current_node, "scale.x", 1, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_grow_vertical(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", gui.get_scale(old_node), gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.move_above(current_node, old_node)
+	gui.set_scale(current_node, vmath.vector3(1, 0.0001, 1))
+	gui.animate(current_node, "scale.y", 1, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_zoom_out(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", vmath.vector3(10, 10, 1), gui.EASING_INOUTSINE, duration)
+	gui.animate(old_node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, delete_node)
+end
+
+local function transition_zoom_in(duration)
+	duration = duration or 0.5
+	gui.animate(old_node, "scale", gui.get_scale(old_node), gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.move_above(current_node, old_node)
+	gui.set_alpha(current_node, 0)
+	gui.set_scale(current_node, vmath.vector3(10, 10, 1))
+	gui.animate(current_node, "scale", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, duration)
+	gui.animate(current_node, "color.w", 1, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_slide_vertical(duration)
+	duration = duration or 0.7
+	local y = gui.get_size(current_node).y
+	gui.animate(old_node, "position.y", y, gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.set_position(current_node, vmath.vector3(0, -y+1, 0))
+	gui.animate(current_node, "position.y", 0, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_slide_horizontal(duration)
+	duration = duration or 1
+	local x = gui.get_size(current_node).x
+	gui.animate(old_node, "position.x", -x, gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.set_position(current_node, vmath.vector3(x-1, 0, 0))
+	gui.animate(current_node, "position.x", 0, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_slide_vertical_reverse(duration)
+	duration = duration or 0.7
+	local y = gui.get_size(current_node).y
+	gui.animate(old_node, "position.y", -y, gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.set_position(current_node, vmath.vector3(0, y-1, 0))
+	gui.animate(current_node, "position.y", 0, gui.EASING_INOUTSINE, duration)
+end
+
+local function transition_slide_horizontal_reverse(duration)
+	duration = duration or 1
+	local x = gui.get_size(current_node).x
+	gui.animate(old_node, "position.x", x, gui.EASING_INOUTSINE, duration, 0, delete_node)
+	gui.set_position(current_node, vmath.vector3(-x+1, 0, 0))
+	gui.animate(current_node, "position.x", 0, gui.EASING_INOUTSINE, duration)
+end
+
+local function change_scene_instantly(scene, color)
+	delete_node(_, old_node)
+	delete_node(_, current_node)
+	create_new_scene(scene, color)
+end
+
+local transitions = {
+	instant = transition_instant,
+	fade = transition_fade,
+	fade_to_black = transition_fade_to_black,
+	shrink = transition_shrink,
+	grow = transition_grow,
+	grow_horizontal = transition_grow_horizontal,
+	grow_vertical = transition_grow_vertical,
+	zoom_out = transition_zoom_out,
+	zoom_in = transition_zoom_in,
+	slide_horizontal = transition_slide_horizontal,
+	slide_horizontal_reverse = transition_slide_horizontal_reverse,
+	slide_vertical = transition_slide_vertical,
+	slide_vertical_reverse = transition_slide_vertical_reverse,
+}
+
+local function action_scene(scene, transition, duration, color, transition_color)
+	create_new_scene(scene, color)
+	if old_node and transition then
+		(transitions[transition] or transition_instant)(duration, transition_color)
+	else
+		transition_instant()
+	end
+end
+
+local function load_scene()
+	local scene_current = save.get_var("scene.current")
+	local scene_current_color = save.get_var("scene.current_color")
+	if scene_current then
+		change_scene_instantly(scene_current, scene_current_color)
+	end
+end
+
+
+
+-- Weather
+
+local function clear_weather()
+	gui.stop_particlefx(gui.get_node("weather_particles"), { clear = true })
+	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+end
+
+local function stop_weather()
+	gui.stop_particlefx(gui.get_node("weather_particles"))
+	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+end
+
+local function start_fog()
+	gui.animate(gui.get_node("weather_color"), "color.w", 0.5, gui.EASING_INOUTSINE, 3, 0, start_fog, gui.PLAYBACK_LOOP_PINGPONG)
+end
+
+
+local function change_weather(weather)
+	local node = gui.get_node("weather_particles")
+	gui.stop_particlefx(node)
+	gui.set_particlefx(node, weather)
+	gui.play_particlefx(node)
+	if weather == "blizzard" then
+		gui.animate(gui.get_node("weather_color"), "color.w", 0.3, gui.EASING_INOUTSINE, 0.2, 0, start_fog)
+	else
+		gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+	end
+end
+
+local function set_weather(weather)
+	if weather == "none" then
+		stop_weather()
+	elseif weather == "clear" then
+		clear_weather()
+	elseif weather then 
+		change_weather(weather)
+	end
+end
+
+
+
+
+
+function init(self)
+	local gui_scale = gui.get_scale(gui.get_node("gui"))
+	gui.set_size(gui.get_node("background"), vmath.vector3(display_width / gui_scale.x, display_height / gui_scale.y, 0))
+end
+
+function update(self, dt)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("scene") then
+		gui.set_enabled(gui.get_node("background_default"), false) 
+		action_scene(message.scene, message.transition, message.duration, message.color,  message.transition_color)
+	elseif message_id == hash("action_set") then 
+		if message.name == "scene.weather" then
+			set_weather(message.value or message.value_string)
+		end
+	elseif message_id == hash("set_render_order") then 
+		gui.set_render_order(message.n)
+	elseif message_id == hash("loaded") then
+		load_scene()
+		clear_weather()
+		local weather = save.get_var("scene.weather")
+		if weather then 
+			set_weather(weather)
+		end
+	end
+end

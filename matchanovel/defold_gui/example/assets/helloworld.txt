@@ -1,0 +1,3 @@
+This is an empty MatchNovel project.
+To open a script, use matchanovel.init(filename) before matchanovel.start().
+For an example, see the file /matchanovel/defold_gui/example/main.script.

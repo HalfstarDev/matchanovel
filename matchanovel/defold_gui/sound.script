@@ -1,0 +1,105 @@
+local save = require "matchanovel.save"
+
+local function set_volume_bgm(volume)
+	sound.set_group_gain(hash("bgm"), volume)
+end
+
+local function set_volume_sfx(volume)
+	sound.set_group_gain(hash("sfx"), volume)
+end
+
+local function play(self, url)
+	sound.stop(url)
+	sound.stop("#"..self.bgm)
+	sound.set_gain("#"..self.bgm, 0)
+	sound.play("#"..self.bgm)
+	local bgm_fade_time = save.get_var("sound.bgm_fade_time") or 0
+	go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 1, go.EASING_INOUTSINE, bgm_fade_time, 0)
+end
+
+local function start_bgm(self, name)
+	if self.bgm ~= name then 
+		save.set_var("sound.bgm", name)
+		if self.bgm then 
+			local old = self.bgm
+			self.bgm = name
+			local bgm_fade_time = save.get_var("sound.bgm_fade_time") or 0
+			go.animate("#"..old, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, bgm_fade_time, 0, play)
+		else
+			self.bgm = name
+			play(self)
+		end
+	end
+end
+
+local function stopped(self)
+	sound.set_group_gain(hash("master"), 0)
+end
+
+local function stop(self)
+	go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped)
+end
+
+local function stopped_music(self, url)
+	self.bgm = false
+	sound.stop(url)
+end
+
+local function stop_music(self)
+	go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped_music)
+end
+
+local function stop_sound(self)
+end
+
+local function sfx(self, id)
+	sound.play("#"..id)
+end
+
+local function action_play(id)
+	sound.get_groups()
+end
+
+
+
+
+function init(self)
+	local volume_master = save.get_var("sound.volume_master")
+	if volume_master then 
+		sound.set_group_gain(hash("master"), volume_master)
+	end
+	sound.set_group_gain(hash("bgm"), 1)
+	sound.set_group_gain(hash("sfx"), 1)
+	--msg.post("#", "play_music", {id = "bgm"})
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("play") then
+		action_play(message.id)
+	elseif message_id == hash("play_music") then
+		if message.id then
+			start_bgm(self, message.id)
+		end
+	elseif message_id == hash("play_sfx") then
+		sfx(self, message.id)
+	elseif message_id == hash("play_voice") then
+		sfx(self, message.id)
+	elseif message_id == hash("stop_music") then
+		stop_music(self)
+	elseif message_id == hash("stop_sound") then
+		stop_sound(self)
+	elseif message_id == hash("stop") then
+		stop(self)
+	elseif message_id == hash("sfx") then
+		sfx(self, message.id)
+	elseif message_id == hash("set_volume_bgm") then
+		set_volume_bgm(message.volume)
+	elseif message_id == hash("set_volume_sfx") then
+		--set_volume_sfx(message.volume)
+	elseif message_id == hash("start") then
+		local bgm = save.get_var("sound.bgm")
+		if bgm then
+			start_bgm(self, bgm)
+		end
+	end
+end
