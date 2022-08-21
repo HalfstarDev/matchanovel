@@ -1,15 +1,15 @@
 script: "/matchanovel/defold_gui/menu.gui_script"
 fonts {
   name: "serif"
-  font: "/main/fonts/serif.font"
+  font: "/matchanovel/defold_gui/fonts/serif.font"
 }
 fonts {
   name: "sans"
-  font: "/main/fonts/sans.font"
+  font: "/matchanovel/defold_gui/fonts/sans.font"
 }
 fonts {
   name: "dyslexia"
-  font: "/main/fonts/dyslexia.font"
+  font: "/matchanovel/defold_gui/fonts/dyslexia.font"
 }
 textures {
   name: "atlas"

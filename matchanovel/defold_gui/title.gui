@@ -1,7 +1,7 @@
 script: "/matchanovel/defold_gui/title.gui_script"
 fonts {
   name: "sans"
-  font: "/main/fonts/sans.font"
+  font: "/matchanovel/defold_gui/fonts/sans.font"
 }
 background_color {
   x: 0.0

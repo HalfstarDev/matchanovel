@@ -1,5 +1,5 @@
 [bootstrap]
-main_collection = /matchanovel/example/main.collectionc
+main_collection = /matchanovel/defold_gui/example/main.collectionc
 
 [script]
 shared_state = 1
@@ -16,8 +16,7 @@ package = com.halfstaratelier.matchanovel
 [project]
 title = MatchaNovel
 version = 0.1
-custom_resources = matchanovel/example/assets
-bundle_resources = matchanovel/example/assets
+custom_resources = matchanovel/defold_gui/example/assets
 
 [sprite]
 max_count = 512

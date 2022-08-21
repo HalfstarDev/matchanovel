@@ -16,7 +16,7 @@ components {
 embedded_components {
   id: "bgm"
   type: "sound"
-  data: "sound: \"/assets/audio/bgm/bgm.ogg\"\n"
+  data: "sound: \"/matchanovel/defold_gui/assets/silence.ogg\"\n"
   "looping: 1\n"
   "group: \"bgm\"\n"
   "gain: 0.5\n"
