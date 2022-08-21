@@ -356,4 +356,6 @@ Because this is still in early development, I will change much of the code base 
 
 If you want to help right now, either creating small projects with MatchaNovel, or adding useful features to the Defold engine would be best. 
 
+Or donate on [GitHub Sponsor](https://github.com/sponsors/HalfstarDev).
+
 ---
