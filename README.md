@@ -46,7 +46,7 @@ You can use MatchaNovel either:
 - or by importing the library in Defold or another Lua based engine **(recommended for integrating into a larger non-VN game)**
 
 
-To import as a library, add https://github.com/HalfstarDev/matchanovel/archive/refs/tags/test2.zip to the dependencies in your game.project file.
+To import as a library, add https://github.com/HalfstarDev/matchanovel/archive/refs/tags/v0.1.0.zip to the dependencies in your game.project file.
 
 ---
 
