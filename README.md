@@ -62,6 +62,7 @@ Hello World!
 ```
 That's enough for a hello world program. If you start the project, it will repeat the text you wrote in the script. This works because any text that is not recognized as another valid action will be used as "say" action, and printed to the textbox.
 
+### Label and jump:
 Now some more actions:
 ```
 label start
@@ -73,6 +74,7 @@ To jump to a label, use
 jump label_name
 ```
 
+### Speak:
 If you want a text to be spoken by a specific character, use a colon:
 ```
 Alice: Hello.
@@ -85,6 +87,7 @@ a: Hello.
 a: How are you?
 ```
 
+### Variables:
 In general, the line
 ```lua
 x = z
@@ -159,7 +162,6 @@ hide a transition = move_down duration = 1
 hide a transition = shrink
 pos_down.y = -0.5
 hide a to = pos_down
-
 ```
 
 ### Scenes:
@@ -217,7 +219,6 @@ Furthermore, you can use the argument `transition_color` to change the color of 
 ```
 scene green transition = fade_to_black transition_color = red
 ```
-
 
 ### If:
 
@@ -313,6 +314,7 @@ Comments are denoted with `--`, as usual in Lua. You can use those to structure 
 
 
 ---
+
 ## More
 I will add manuals for advanced features soon:
 - How to edit the GUI
@@ -324,6 +326,7 @@ I will add manuals for advanced features soon:
 For more questions, you can ask on the [official Discord channel](https://discord.gg/uUtEVtr9tm).
 
 ---
+
 ## Roadmap
 Features currently in work:
 - More animation options
@@ -347,11 +350,10 @@ Future plans:
 Feel free to ask for more features.
 
 ---
+
 ## Support
 Because this is still in early development, I will change much of the code base frequently, so pull requests don't make much sense at this point (although you are free to experiment with the code however you like, it's open source).
 
 If you want to help right now, either creating small projects with MatchaNovel, or adding useful features to the Defold engine would be best. 
 
-
 ---
-
