@@ -45,7 +45,9 @@ You can use MatchaNovel either:
 - or by downloading the standalone reader and editing the script and asset files **(recommended for quick prototyping without advanced features)**
 - or by importing the library in Defold or another Lua based engine **(recommended for integrating into a larger non-VN game)**
 
+
 To import as a library, add https://github.com/HalfstarDev/matchanovel/archive/refs/tags/test2.zip to the dependencies in your game.project file.
+
 ---
 
 ## How to use:
@@ -116,7 +118,7 @@ a: Is x larger than or equal to 9? {x >= 9 and "Yes" or "No"}.
 a: Turn all vowels in this sentence into stars: {string.gsub("Turn all vowels in this sentence into stars", "[AEIOUaeiou]", "*")}
 ```
 
-###Sprites:
+### Sprites:
 To show a sprite for a character, use
 ```
 a.sprite = "alice.png"
@@ -160,7 +162,7 @@ hide a to = pos_down
 
 ```
 
-###Scenes:
+### Scenes:
 
 To show a background scene, use:
 ```
@@ -217,7 +219,7 @@ scene green transition = fade_to_black transition_color = red
 ```
 
 
-###If:
+### If:
 
 You can add branches based on the value of a variable, like:
 ```
@@ -233,7 +235,7 @@ If the expression after if is true, then the action block starting in the next l
 If at the end of the action block you did not jump out of if, you will jump to the next line with a lower indention. For longer branches, it is recommended to use jumps to the base line instead of having a big tree-like indention structure.
 
 
-###Choice:
+### Choices:
 
 This will give the reader a number of choices to pick, and execute a different branch according to the picked choice:
 ```
@@ -262,7 +264,7 @@ scene.weather = "fireflies"
 scene.weather = "clear"
 ```
 
-###Pronouns:
+### Pronouns:
 MatchaNovel can be extended with Lua modules. As an example, a preinstalled pronoun system is implemented as a Lua extension. To set pronouns, simply use
 ```
 pronouns = "she"
@@ -289,7 +291,7 @@ b.pronouns = "he"
 
 > Alice prefers she, Bob prefers he.
 
-###Music and sound:
+### Music and sound:
 
 To play music, you have to first add the file to the `sound.go` game object in Defold. Clone the `bgm` or `sfx` component, depending on if you need a background music or sound effect. Then change the sound property. You can also change gain, pan, and speed for each file. Make sure that looping is checked if you want the file to repeat until it is stopped.
 
@@ -305,7 +307,7 @@ stop music
 ```
 
 
-###Comments:
+### Comments:
 
 Comments are denoted with `--`, as usual in Lua. You can use those to structure your script and leave annotations.
 
