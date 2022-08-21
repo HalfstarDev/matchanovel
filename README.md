@@ -81,7 +81,7 @@ Alice: Hello.
 ```
 
 The name before the colon will be displayed above the text. If you don't want to write out the full name every time, you can assign a character to a variable, like this:
-```
+```lua
 a.name = "Alice"
 a: Hello.
 a: How are you?
@@ -104,7 +104,7 @@ a: My name is {a.name}.
 ```
 
 If you need a string capitalized, just write the name capitalized when calling it.
-```
+```lua
 abc = "test"
 a: {abc} {Abc} {ABC}.
 ```
@@ -123,18 +123,18 @@ a: Turn all vowels in this sentence into stars: {string.gsub("Turn all vowels in
 
 ### Sprites:
 To show a sprite for a character, use
-```
+```lua
 a.sprite = "alice.png"
 show a
 ```
 where `a.sprite` must be either a file in `\assets\images\sprites`, or the path from your project folder to the file, like
-```
+```lua
 a.sprite = "/custom_folder/spr/a01.png"
 ```
 Note that any folder that you use this way must be added to Custom Resources in your `game.project` file.
 
 If you don't specify a position, the character will appear in the center of the screen, starting from the bottom. To define and specify a position, use:
-```
+```lua
 pos_a.x = 0.75
 pos_a.y = 0
 show a at = pos_a
@@ -142,7 +142,7 @@ show a at = pos_a
 The units of x and y are fractions of the screen size. So the position x=0 is at the left of the screen, x=1 at the right, x=0.5 at the center, and x=0.75 between center and right. y=0 is the bottom, y=1 the top, and so on. You can also use numbers smaller than 0 or larger than 1, so for example y=-0.5 would start a half screen height below the bottom.
 
 If you don't want the character to appear instantly, you can also use transitions, like
-```
+```lua
 show a transition = fade
 show a transition = move_up
 show a transition = grow duration = 0.5
@@ -155,7 +155,7 @@ To hide a character again, use:
 hide a
 ```
 You can again use transitions for this, or the value `to` to give a vector to move in, like:
-```
+```lua
 hide a transition = instant
 hide a transition = fade
 hide a transition = move_down duration = 1
@@ -167,14 +167,14 @@ hide a to = pos_down
 ### Scenes:
 
 To show a background scene, use:
-```
+```lua
 scene room.jpg
 ```
 The scene name follows the same rules as sprites, but with the default folder for filenames without a path being `\assets\images\background`.
 
 You can again use the same syntax for transitions and their duration:
 
-```
+```lua
 scene bg.jpg transition = instant
 scene bg.jpg transition = fade duration = 1.5
 scene bg.jpg transition = fade_to_black
@@ -191,17 +191,17 @@ scene bg.jpg transition = slide_vertical_reverse
 ```
 
 You can also change the default transition and duration, so you don't have to change it to the same values every time.
-```
+```lua
 scene.transition = "fade"
 scene.duration = 0.5
 ```
 
 A new argument is `color`, which can be used to change the tint of the image. 
-```
+```lua
 scene bg.jpg color = red
 ```
 This will tint the image red. For colors you can either use HTML names, hex colors, or variables with RGB values (from 0 to 1). These will all do the same:
-```
+```lua
 scene bg.jpg color = cyan
 
 scene bg.jpg color = #00FFFF
@@ -256,7 +256,7 @@ The structure works like with `if` again, with the difference that if you reach 
 
 ###Particles:
 You can create particle effects in the Defold editor. More on that will be explained in an advanced manual soon. Some particle effects are already predefined with scene.weather.
-```
+```lua
 scene.weather = "none"
 scene.weather = "rain"
 scene.weather = "snow"
@@ -267,7 +267,7 @@ scene.weather = "clear"
 
 ### Pronouns:
 MatchaNovel can be extended with Lua modules. As an example, a preinstalled pronoun system is implemented as a Lua extension. To set pronouns, simply use
-```
+```lua
 pronouns = "she"
 pronouns = "he"
 pronouns = "they"
