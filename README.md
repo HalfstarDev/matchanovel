@@ -8,7 +8,7 @@ For an example, try the web demo: [https://halfstar.itch.io/matchanovel](https:/
 ---
 
 ## What is MatchaNovel?
-MatchaNovel is an open source multiplatform engine for narrative works, like visual novels and adventure games. It can be integrated with the Defold game engine or other Lua based engines, to use narrative features like a writer friendly scripting system and automatic textboxes in other genres as well.
+MatchaNovel is an open source multiplatform engine for narrative works, like visual novels and adventure games. It can be integrated with the [Defold](https://defold.com/) game engine or other Lua based engines, to use narrative features like a writer friendly scripting system and automatic textboxes in other genres as well.
 
 It consists of these parts:
 
@@ -354,7 +354,7 @@ Feel free to ask for more features.
 ## Support
 Because this is still in early development, I will change much of the code base frequently, so pull requests don't make much sense at this point (although you are free to experiment with the code however you like, it's open source).
 
-If you want to help right now, either creating small projects with MatchaNovel, or adding useful features to the Defold engine would be best. 
+If you want to help right now, either creating small projects with MatchaNovel, or adding useful features to the [Defold](https://github.com/defold/defold) engine would be best. 
 
 Or donate on [GitHub Sponsor](https://github.com/sponsors/HalfstarDev).
 
