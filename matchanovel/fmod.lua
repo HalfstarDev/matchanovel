@@ -26,6 +26,9 @@ local function fmod_missing()
 end
 
 local function check_banks()
+	M.load_bank("Master")
+	M.load_bank("Master.strings")
+	
 	local bank = save.get_var("fmod.bank")
 	if bank then
 		M.load_bank(bank)
@@ -180,6 +183,22 @@ function M.set_audio_source(id, pan)
 	audio_sources[id] = pan * distance_max
 end
 
+function M.play(event, audio_type, bank, source)
+	if bank then
+		M.load_bank(bank)
+	end
+	if audio_type then
+		volume_type[event] = audio_type
+	end
+	if event then
+		M.start(event)
+		set_volume(event, get_volume(event))
+		if source then
+			M.track_object(source, event)
+		end
+	end
+end
+
 function M.statement(s, args)
 	args = args or {}
 	if fmod_missing() then return end
@@ -188,6 +207,10 @@ function M.statement(s, args)
 	local fmod_event = save.get_var(s..".fmod.event")
 	local fmod_source = save.get_var(s..".fmod.source")
 	local audio_type = args.audio_type or save.get_var(s..".audio_type")
+
+	M.play(fmod_event, audio_type, fmod_bank, fmod_source)
+
+	--[[
 	if fmod_bank then
 		M.load_bank(fmod_bank)
 	end
@@ -201,6 +224,7 @@ function M.statement(s, args)
 			M.track_object(fmod_source, fmod_event)
 		end
 	end
+	--]]
 end
 
 function M.check_for_statement(s)
