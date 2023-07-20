@@ -44,14 +44,12 @@ Platforms it can export to, but I could not test yet without a devkit: **Nintend
 
 ## How to install:
 You can use MatchaNovel either:
-- by opening the empty template project in Defold **(recommended for releasing a visual novel)**
-- or by downloading the standalone reader and editing the script and asset files **(recommended for quick prototyping without advanced features)**
-- or by importing the library in Defold or another Lua based engine **(recommended for integrating into a larger non-VN game)**
+- by opening the [empty template project](https://github.com/HalfstarDev/matchanovel/releases/download/v0.2.0/MatchaNovel.Empty.Defold.project.English.zip) in Defold **(recommended for releasing a visual novel)**
+- (There is also a [seperate template that includes Japanese fonts](https://github.com/HalfstarDev/matchanovel/releases/download/v0.2.0/MatchaNovel.Empty.Defold.project.Japanese.zip), which are not in the English version to keep the file size down.)
+- or by downloading the [standalone reader](https://github.com/HalfstarDev/matchanovel/releases/download/v0.2.0/MatchaNovel.Reader.demo.Windows.zip) and editing the script and asset files **(recommended for quick prototyping without advanced features)**
+- or by importing the [library](https://github.com/HalfstarDev/matchanovel/archive/refs/tags/v0.2.0.zip) in Defold or another Lua based engine **(recommended for integrating into a larger non-VN game)**
 
-
-To import as a library, add https://github.com/HalfstarDev/matchanovel/archive/refs/tags/v0.1.0.zip to the dependencies in your game.project file.
-
-If you import the MatchaNovel library into an existing Defold project, you should also install the [https://github.com/subsoap/defos](DefOS) library, so that the fullscreen setting will work.
+If you import the MatchaNovel library into an existing Defold project, you should also install the [DefOS](https://github.com/subsoap/defos) library, so that the fullscreen setting will work.
 
 ---
 
@@ -577,7 +575,9 @@ b.pronouns = "he"
 
 ### FMOD:
 
-The FMOD library is not preinstalled in this open source version of MatchaNovel, but you can either install the library in your Defold project yourself (see next section), or use the FMOD template project.
+The FMOD library is not preinstalled in the open source version of MatchaNovel,
+but you can either install the library in your Defold project yourself (see next section),
+or use the [FMOD template project](https://github.com/HalfstarDev/matchanovel/releases/download/v0.2.0/MatchaNovel.FMOD.template.zip) with preinstalled FMOD.
 
 To use a FMOD bank, copy the `.bank` files into the folder `/assets/audio/fmod`.
 
