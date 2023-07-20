@@ -1,0 +1,160 @@
+key_trigger {
+  input: KEY_SPACE
+  action: "continue"
+}
+key_trigger {
+  input: KEY_LCTRL
+  action: "skip"
+}
+key_trigger {
+  input: KEY_RCTRL
+  action: "skip"
+}
+key_trigger {
+  input: KEY_F
+  action: "fullscreen"
+}
+key_trigger {
+  input: KEY_TAB
+  action: "toggle_skip"
+}
+key_trigger {
+  input: KEY_PAGEUP
+  action: "back"
+}
+key_trigger {
+  input: KEY_PAGEDOWN
+  action: "forward"
+}
+key_trigger {
+  input: KEY_ENTER
+  action: "enter"
+}
+key_trigger {
+  input: KEY_UP
+  action: "up"
+}
+key_trigger {
+  input: KEY_DOWN
+  action: "down"
+}
+key_trigger {
+  input: KEY_HASH
+  action: "debug_"
+}
+key_trigger {
+  input: KEY_BACKSPACE
+  action: "backspace"
+}
+key_trigger {
+  input: KEY_S
+  action: "screenshot"
+}
+key_trigger {
+  input: KEY_END
+  action: "end"
+}
+key_trigger {
+  input: KEY_HOME
+  action: "home"
+}
+key_trigger {
+  input: KEY_A
+  action: "auto"
+}
+key_trigger {
+  input: KEY_LEFT
+  action: "left"
+}
+key_trigger {
+  input: KEY_RIGHT
+  action: "right"
+}
+key_trigger {
+  input: KEY_X
+  action: "b"
+}
+key_trigger {
+  input: KEY_ESC
+  action: "escape"
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_1
+  action: "touch"
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_2
+  action: "menu"
+}
+mouse_trigger {
+  input: MOUSE_WHEEL_UP
+  action: "back"
+}
+mouse_trigger {
+  input: MOUSE_WHEEL_DOWN
+  action: "forward"
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_3
+  action: "middle"
+}
+gamepad_trigger {
+  input: GAMEPAD_RPAD_DOWN
+  action: "a"
+}
+gamepad_trigger {
+  input: GAMEPAD_RPAD_RIGHT
+  action: "b"
+}
+gamepad_trigger {
+  input: GAMEPAD_LPAD_UP
+  action: "up"
+}
+gamepad_trigger {
+  input: GAMEPAD_LPAD_DOWN
+  action: "down"
+}
+gamepad_trigger {
+  input: GAMEPAD_LPAD_LEFT
+  action: "left"
+}
+gamepad_trigger {
+  input: GAMEPAD_LPAD_RIGHT
+  action: "right"
+}
+gamepad_trigger {
+  input: GAMEPAD_LSTICK_UP
+  action: "up"
+}
+gamepad_trigger {
+  input: GAMEPAD_LSTICK_DOWN
+  action: "down"
+}
+gamepad_trigger {
+  input: GAMEPAD_LSTICK_LEFT
+  action: "left"
+}
+gamepad_trigger {
+  input: GAMEPAD_LSTICK_RIGHT
+  action: "right"
+}
+gamepad_trigger {
+  input: GAMEPAD_RSTICK_UP
+  action: "up"
+}
+gamepad_trigger {
+  input: GAMEPAD_RSTICK_DOWN
+  action: "down"
+}
+gamepad_trigger {
+  input: GAMEPAD_RSTICK_LEFT
+  action: "left"
+}
+gamepad_trigger {
+  input: GAMEPAD_RSTICK_RIGHT
+  action: "right"
+}
+text_trigger {
+  input: TEXT
+  action: "text"
+}
