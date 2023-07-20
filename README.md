@@ -749,7 +749,7 @@ if tonumber(system.time_month) == 1
   
 if system.time_month + 1 == 2
   Next month is February.
-  -- Even this will work, because Lua can add a number to a string representing a number, and will return a number.
+  -- Even this works, because Lua can add a number to a string of a number, and will return a number.
 ```
 
 ---
