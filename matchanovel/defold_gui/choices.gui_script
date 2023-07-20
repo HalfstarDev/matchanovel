@@ -1,6 +1,6 @@
 local matchanovel = require "matchanovel.matchanovel"
 
-local distance = 32
+local distance = 16
 local border_x = 32
 local border_y = 16
 local alpha_hovered = 0.9
@@ -19,7 +19,8 @@ local nodes = {}
 
 local function get_text_size(node, text)
 	local font_resource = gui.get_font_resource(gui.get_font(node))
-	local metrics = resource.get_text_metrics(font_resource, text)
+	local options = {line_break = true, width = gui.get_size(node).x}
+	local metrics = resource.get_text_metrics(font_resource, text, options)
 	local text_scale = gui.get_scale(node)
 	local width = metrics.width * text_scale.x
 	local height = metrics.height * text_scale.y
@@ -45,8 +46,11 @@ end
 local function create_choices(choices)
 	delete_choices()
 	current_text = choices
+	local x = 0
 	local y = 0
 	for k, text in pairs(choices) do
+		text = string.gsub(text, "\\n", "\n")
+		
 		nodes[k] = gui.clone_tree(gui.get_node("choice"))
 		local node_choice = nodes[k][hash("choice")]
 		local node_box = nodes[k][hash("choice_box")]
@@ -61,8 +65,11 @@ local function create_choices(choices)
 		gui.set_color(node_box, color_unhovered)
 		y = y - text_height/2 - border_y - distance
 	end
+	local node_choices = gui.get_node("choices")
+	x = gui.get_position(node_choices).x
 	y = y + border_y + distance
-	gui.set_position(gui.get_node("choices"), vmath.vector3(0, -y/2, 0))
+	gui.set_position(gui.get_node("choices"), vmath.vector3(x, -y/2, 0))
+	unhide_choices()
 end
 
 local function pick_choices(choice)
@@ -108,7 +115,8 @@ function on_message(self, message_id, message, sender)
 	if message_id == hash("show_text_choices") then
 		local choices = {}
 		for k, v in pairs(message.text) do
-			choices[k] = v[0]
+			--choices[k] = v[0]
+			choices[k] = v
 		end
 		create_choices(choices)
 		active = true
@@ -122,12 +130,14 @@ function on_message(self, message_id, message, sender)
 		unhide_choices()
 	elseif message_id == hash("event_window_resized") then 
 		--window_resized_zoom = message.zoom
-		local scale = vmath.vector3(message.zoom, message.zoom, 1)
-		gui.set_scale(gui.get_node("center"), scale)
+		--local scale = vmath.vector3(message.zoom, message.zoom, 1)
+		--gui.set_scale(gui.get_node("center"), scale)
 	elseif message_id == hash("set_render_order") then 
 		gui.set_render_order(message.n)
 	elseif message_id == hash("loaded") then
 		unhide_choices()
+	elseif message_id == hash("unload") then
+		hide_choices()
 	end
 end
 

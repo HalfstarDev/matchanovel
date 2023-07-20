@@ -2,9 +2,7 @@ local files = require "matchanovel.engine.defold.filesys"
 
 local M = {}
 
-local app_id = "Untitled MatchaNovel project"
-local path_settings = files.get_save_file(app_id, "settings.dat")
-local path_global = files.get_save_file(app_id, "global.dat")
+local app_id = "MatchaNovel demo 0.2"
 
 local saves_limit = 999
 local quicksaves_limit = 1
@@ -38,6 +36,12 @@ M.global.read_lines = {}
 M.global.var = {}
 M.global.max_written_save_slot = 1
 
+function M.get_save_file(file_name)
+	return files.get_save_file(app_id, file_name)
+end
+
+local path_settings = M.get_save_file("settings.dat")
+local path_global = M.get_save_file("global.dat")
 
 local function get_digits(number)
 	return #(number.."")
@@ -67,16 +71,17 @@ local function get_time()
 	return os.date("%Y"), os.date("%m"), os.date("%d"), os.date("%T")
 end
 
-local function get_path(slot, quick, auto)
+function M.get_path(slot, quick, auto, extension)
+	extension = extension or "dat"
 	if quick then 
 		local n = get_number_string(slot, quicksaves_limit)
-		return files.get_save_file(app_id, "quicksave_"..n..".dat")
+		return files.get_save_file(app_id, "quicksave_"..n.."."..extension)
 	elseif auto then 
 		local n = get_number_string(slot, autosaves_limit)
-		return files.get_save_file(app_id, "autosave_"..n..".dat")
+		return files.get_save_file(app_id, "autosave_"..n.."."..extension)
 	else
 		local n = get_number_string(slot, saves_limit)
-		return files.get_save_file(app_id, "save_"..n..".dat")
+		return files.get_save_file(app_id, "save_"..n.."."..extension)
 	end
 end
 
@@ -88,7 +93,7 @@ local function read_slot(slot, quick, auto)
 	if quick then
 		slot = quicksave_number_to_slot(slot)
 	end
-	local p = get_path(slot, quick, auto)
+	local p = M.get_path(slot, quick, auto)
 	return files.load_file(p)
 end
 
@@ -140,12 +145,13 @@ function M.get_current_text()
 end
 
 function M.write(slot, quick, auto)
-	local filename = get_path(slot, quick, auto)
+	local filename = M.get_path(slot, quick, auto)
 	local y, m, d, t = get_time()
 	M.state.y = y
 	M.state.m = m
 	M.state.d = d
 	M.state.t = t
+	
 	files.save_file(filename, M.state)
 	if not quick and not auto then
 		used[slot] = true
@@ -174,15 +180,20 @@ local function is_table(a)
 end
 
 function M.load(slot)
-	loaded_table = files.load_file(get_path(slot, false, false))
+	loaded_table = files.load_file(M.get_path(slot, false, false))
 	local loaded = is_table(loaded_table)
 	if loaded then
 		M.state.pos = loaded_table.pos
 		M.state.log = loaded_table.log
+		M.state.log_names = loaded_table.log_names
 		M.state.var = loaded_table.var
 		M.state.var_type = loaded_table.var_type
 		M.state.call_stack = loaded_table.call_stack
 		M.state.sprites = loaded_table.sprites
+		if #M.state.log > 0 then
+			table.remove(M.state.log, #M.state.log)
+			table.remove(M.state.log_names, #M.state.log_names)
+		end
 	end
 	return loaded
 end
@@ -190,6 +201,7 @@ end
 function M.reset()
 	M.state.pos = 0
 	M.state.log = {}
+	M.state.log_names = {}
 	M.state.var = {}
 	M.state.var_type = {}
 	M.state.call_stack = {}
@@ -198,11 +210,12 @@ end
 
 function M.quickload(number)
 	local slot = quicksave_number_to_slot(number)
-	loaded_table = files.load_file(get_path(slot, true, false))
+	loaded_table = files.load_file(M.get_path(slot, true, false))
 	local loaded = is_table(loaded_table)
 	if loaded then
 		M.state.pos = loaded_table.pos
 		M.state.log = loaded_table.log
+		M.state.log_names = loaded_table.log_names
 		M.state.var = loaded_table.var
 		M.state.var_type = loaded_table.var_type
 		M.state.call_stack = loaded_table.call_stack
@@ -239,24 +252,85 @@ function M.is_used_quick(slot)
 	return slot <= used_quick
 end
 
+function M.get_url()
+	return files.get_save_file(app_id, "")
+end
+
 function M.open_folder()
 	files.open_folder(app_id)
 end
 
-function M.set_var(name, value, type)
-	M.state.var[name] = value
-	M.state.var_type[name] = type
+function M.init_variables()
+	for k, v in pairs(M.state.var) do
+		defined_variables[k] = v
+	end
+	for k, v in pairs(M.state.var_type) do
+		defined_variables_type[k] = v
+	end
+	M.state.var = {}
+	M.state.var_type = {}
 end
 
-function M.define(name, value, type)
-	defined_variables[name] = value
-	defined_variables_type[name] = type
+function M.set_var(name, value, var_type)
+	name = string.lower(name)
+	M.state.var[name] = value
+	M.state.var_type[name] = var_type or type(var_type)
 end
+
+function M.define(name, value, var_type)
+	name = string.lower(name)
+	defined_variables[name] = value
+	defined_variables_type[name] = var_type or type(var_type)
+end
+
+local default_variables = {
+	["project.title"] = "Untitled MatchaNovel project",
+	["sprites.scale"] = 1,
+	["audio.volume"] = 1,
+	["audio.pan_distance"] = 0.8,
+	["music.volume"] = 1,
+	["sound.volume"] = 1,
+	["voice.volume"] = 1,
+	["skip.all"] = false,
+	["show.transition"] = "fade",
+	["show.duration"] = 0.5,
+	["show.easing"] = "INOUTSINE",
+	["show.below"] = "front",
+	["hide.transition"] = "fade",
+	["hide.duration"] = 0.5,
+	["hide.easing"] = "INOUTSINE",
+	["move.duration"] = 0.5,
+	["move.easing"] = "INOUTSINE",
+	["flip.duration"] = 0.5,
+	["scene.transition"] = "fade",
+	["scene.duration"] = 1.0,
+	["scene.weather"] = "none",
+	["loremipsum"] = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum.",	
+}
 
 function M.get_var(name)
-	local value = M.state.var[name] or defined_variables[name]
-	local type = M.state.var_type[name] or defined_variables_type[name]
-	if type == "pointer" then 
+	name = string.lower(name)
+	
+	local value
+	local var_type 
+	
+	var_type = M.state.var_type[name]
+	if var_type then
+		value = M.state.var[name]
+	else
+		var_type = defined_variables_type[name]
+		if var_type then
+			value = defined_variables[name]
+		else
+			value = default_variables[name]
+		end
+	end
+
+	if not var_type and value ~= nil then
+		var_type = type(value)
+	end
+	
+	if var_type == "pointer" then 
 		local v, t = M.get_var(value)
 		if v then
 			return v, t
@@ -264,7 +338,7 @@ function M.get_var(name)
 			return value, "string"
 		end
 	else
-		return value, type
+		return value, var_type
 	end
 	
 end
@@ -318,6 +392,9 @@ function M.add_to_log(text, name)
 end
 
 function M.get_log(line)
+	--pprint(M.state.log)
+	--print(M.state.log_names)
+	--print(line, M.state.log[line])
 	return M.state.log[line], M.state.log_names[line]
 end
 
@@ -350,6 +427,31 @@ function M.set_save_folder_name(name)
 	app_id = name
 end
 
+function M.save_file(name, data)
+end
+
+local function get_screenshots_path(n)
+	return "screenshots\\screenshot_"..n..".png"
+end
+
+local function get_screenshots_number(start)
+	local filename = get_screenshots_path(start)
+	if files.does_file_exist(filename) then
+		return get_screenshots_number(start + 1)
+	else
+		return start
+	end
+end
+
+function M.screenshot()
+	if screenshot then
+		screenshot.png(function(self, png, w, h)
+			local filename = get_screenshots_path(get_screenshots_number(1))
+			files.write_binary(filename, png)
+		end)
+	end
+end
+
 function M.update(dt)
 	if flag_write_global then
 		write_global()
@@ -360,7 +462,6 @@ function M.init()
 	load_global()
 	M.check_save_number(M.global.max_save or 4)
 end
-
 
 
 return M

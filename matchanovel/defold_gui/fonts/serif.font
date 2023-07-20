@@ -1,4 +1,4 @@
-font: "/builtins/fonts/vera_mo_bd.ttf"
+font: "/matchanovel/defold_gui/fonts/NotoSerif-Medium.ttf"
 material: "/builtins/fonts/font-df.material"
 size: 48
 antialias: 1

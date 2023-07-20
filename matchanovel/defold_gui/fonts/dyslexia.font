@@ -1,6 +1,6 @@
-font: "/builtins/fonts/vera_mo_bd.ttf"
+font: "/matchanovel/defold_gui/fonts/AtkinsonHyperlegible-Regular.ttf"
 material: "/builtins/fonts/font-df.material"
-size: 48
+size: 52
 antialias: 1
 alpha: 1.0
 outline_alpha: 1.0

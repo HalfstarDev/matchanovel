@@ -11,12 +11,15 @@ local actions = {}
 local arguments = {}
 -- table of position of all labels
 local labels = {}
-
+local file_labels = {}
 
 local define = true
 
 --local definition = require "matchanovel.matchascript_novel"
 local definition
+
+local scripts_folder = "\\assets\\scripts\\"
+
 
 function file_exists(name)
 	local f = io.open(name, "r")
@@ -287,8 +290,9 @@ local function execute_function(action, args)
 	end
 end
 
-
-
+local function get_scripts()
+	return files.load_script(scripts_folder.."scripts.txt")
+end
 
 -- set table of definitons for the script file
 function M.set_definition(definition_table)
@@ -297,6 +301,13 @@ end
 
 function M.add_file(filename)
 	load_file(filename)
+end
+
+function M.load_scripts()
+	local scripts_list = get_scripts()
+	for _, v in pairs(scripts_list) do
+		load_file(scripts_folder..v)
+	end
 end
 
 -- create tables of actions from script file
@@ -368,7 +379,8 @@ function M.init()
 						local is_furthes_to_left = arg_left and ((not arguments[k].left) or #arg_left < #arguments[k].left)
 						local is_equally_far_to_left = arg_left and arguments[k].left and #arg_left == #arguments[k].left
 						local is_longer = #operator > operator_length
-						if is_furthes_to_left or (is_equally_far_to_left and is_longer) then
+						local escape_character = arg_left and string.match(arg_left, "%\\$")
+						if (is_furthes_to_left or (is_equally_far_to_left and is_longer)) and not escape_character then
 							action = action_name
 							arguments[k].left = arg_left
 							arguments[k].right = arg_right
@@ -401,25 +413,28 @@ function M.init()
 			end
 		end
 
-		if define then 
+		if define then
 			execute_function(actions[k], arguments[k])
 		end
 	end
 	define = false
+	save.init_variables()
 end
 
 -- execute the action on the current line
 function M.execute()
 	local action = actions[save.state.pos]
 	local args = arguments[save.state.pos]
+	--pprint(action, args)
 	
 	for _, extension in pairs(definition.extensions) do
 		if extension.before_action then
 			extension.before_action(action, args)
 		end
 	end
-	
-	if action == "none" or action == "empty" then
+
+	--if action == "none" or action == "empty" then
+	if action == "empty" then
 		M.next()
 	else
 		execute_function(action, args)
@@ -435,6 +450,13 @@ end
 function M.jump_to_line(line)
 	M.set_line(line)
 	M.execute()
+end
+
+
+function M.label_exists(label)
+	if labels[label] then
+		return true
+	end
 end
 
 -- jump to line of given label and execute it
@@ -498,8 +520,11 @@ end
 
 
 -- jump to line of given by label "start" and execute it 
-function M.start()
-	if labels["start"] then
+function M.start(label)
+	--save.init_variables()
+	if label and labels[label] then
+		M.jump_to_label(label)
+	elseif labels["start"] then
 		M.jump_to_label("start")
 	else
 		M.jump_to_line(1)
@@ -509,6 +534,5 @@ end
 local function add_line_to_script(line)
 	table.insert(script, line)
 end
-
 
 return M

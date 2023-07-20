@@ -1,0 +1,87 @@
+
+project.title = "MatchaNovel demo"
+
+--------------------------------
+-- Positions
+--------------------------------
+
+pos_center.x = 0.5
+pos_center.y = 0
+
+pos_left.x = 0.25
+pos_left.y = 0
+
+pos_right.x = 0.75
+pos_right.y = 0
+
+pos_back.x = 0.35
+pos_back.y = 0.4
+pos_back.scale = 0.4
+
+pos_loop_1.x = 0.25
+pos_loop_1.y = 0.0
+
+pos_loop_2.x = 0.75
+pos_loop_2.y = 0.0
+
+
+sprites.auto_2.width = 0.4
+sprites.auto_3.width = 0.6
+sprites.auto_4.width = 0.75
+sprites.auto_5.width = 0.9
+sprites.auto.duration = 1
+
+
+--------------------------------
+-- Characters
+--------------------------------
+
+sprites.scale = 1.0
+show.transition = "fade"
+
+c.name = "Chloe"
+c.sprite = "chloe.png"
+c.scale = 1
+c.y = -0.9
+
+s1.name = "Sprite One"
+s1.sprite = "sprite_1.png"
+s1.one.sprite = "sprite_1.png"
+s1.two.sprite = "sprite_2.png"
+s1.three.sprite = "sprite_3.png"
+s1.y = 0.4
+
+s2.name = "Sprite Two"
+s2.sprite = "sprite_2.png"
+s2.y = 0.4
+
+s3.name = "Sprite Three"
+s3.sprite = "sprite_3.png"
+s3.y = 0.4
+
+owl.spine = "owl"
+owl.y = 0.1
+
+
+--------------------------------
+-- Scenes
+--------------------------------
+
+scene.transition = "fade"
+scene.duration = 1.0
+
+river.image = "bg_river.jpg"
+bridge.image = "bg_bridge.jpg"
+
+sky.color = #63b5e9
+
+
+--------------------------------
+-- Other
+--------------------------------
+
+skip.all = false
+audio.volume = 1.0
+audio.pan_distance = 1
+
+

@@ -14,16 +14,49 @@ function M.save_file(filename, table)
 	return save_file(filename, table)
 end
 
+function M.write_binary(filename, data)
+	local file = io.open(filename, "wb")
+	file:write(data)
+	file:flush()
+	file:close()
+end
+
+function M.read_binary(filename)
+	local file = io.open(filename, "rb")
+	if file then
+		local s = file:read("*a")
+		file:close()
+		return s
+	end
+end
+
+function M.does_file_exist(filename)
+	local file = io.open(filename, "r")
+	if file then
+		file:close()
+		return true
+	end
+end
+
 function M.load_script(filename)
 	local loaded = {}
 	local external = file_exists("."..filename)
 	if external then
-		for line in io.lines("."..filename) do table.insert(loaded, line) end
+		for line in io.lines("."..filename) do
+			line = string.gsub(line, "\r", "")
+			line = string.gsub(line, "\n", "")
+			table.insert(loaded, line)
+		end
 	else
-		local internal = load_resource(filename)
-		if internal then 
+		filename = string.gsub(filename, "\\", "/")
+		local internal, error = load_resource(filename)
+		if error then
+			print("load_script error:", error)
+		elseif internal then 
 			local crlf = "\n"
 			for line in (internal..crlf):gmatch("(.-)"..crlf) do
+				line = string.gsub(line, "\r", "")
+				line = string.gsub(line, "\n", "")
 				table.insert(loaded, string.sub(line, 0, -1))
 			end
 		end

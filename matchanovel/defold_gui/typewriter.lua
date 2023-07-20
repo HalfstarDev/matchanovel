@@ -127,7 +127,6 @@ local function delete_letters()
 	end
 end
 
-
 local function set_letters(line_table, instant)
 	for _, node in pairs(current.letter_nodes) do
 		gui_cancel_animation(node, "color.w")
@@ -137,12 +136,12 @@ local function set_letters(line_table, instant)
 
 	local font_resource = gui_get_font_resource(gui_get_font(current.node))
 	local text = "X"
-	local metrics = resource_get_text_metrics(font_resource, text)
+	local metrics = resource_get_text_metrics(font_resource, text, {tracking = current.tracking, leading = current.leading})
 	local height = metrics.height
 	local width = metrics.width
 
 	if current.line_spacing_scale then
-		height = height * current.line_spacing_scale
+		height = height * current.line_spacing_scale * current.leading
 	end
 
 	n_letters = 0
@@ -151,7 +150,7 @@ local function set_letters(line_table, instant)
 		local character_table = create_character_table(line)
 		for j, character in pairs(character_table) do
 			n_letters = n_letters + 1
-			metrics = resource_get_text_metrics(font_resource, text.."X")
+			metrics = resource_get_text_metrics(font_resource, text.."X", {tracking = current.tracking, leading = current.leading})
 			local letter = get_letter(n_letters)
 			gui_set_text(letter, character)
 			gui_cancel_animation(letter, "position")
@@ -180,7 +179,7 @@ local function reposition_letters(line_table)
 
 	local font_resource = gui_get_font_resource(gui_get_font(current.node))
 	local text = "X"
-	local metrics = resource_get_text_metrics(font_resource, text)
+	local metrics = resource_get_text_metrics(font_resource, text, {tracking = current.tracking, leading = current.leading})
 	local height = metrics.height
 	local width = metrics.width
 
@@ -194,7 +193,7 @@ local function reposition_letters(line_table)
 		local character_table = create_character_table(line)
 		for j, character in pairs(character_table) do
 			n_letters = n_letters + 1
-			metrics = resource_get_text_metrics(font_resource, text.."X")
+			metrics = resource_get_text_metrics(font_resource, text.."X", {tracking = current.tracking, leading = current.leading})
 			local letter = get_letter(n_letters)
 			gui_animate(letter, "position", v3((metrics.width - width), (1-k)*height, 0), EASING_LINEAR, current.zoom_speed)
 			text = text..character
@@ -219,15 +218,27 @@ end
 
 
 local function split_text_into_lines(text, max_width)
+	local linebreak_1, linebreak_2 = string.match(text, "(.*)%\\n(.*)")
+	if linebreak_1 and linebreak_2 then
+		local lines_1 = split_text_into_lines(linebreak_1, max_width)
+		local lines_2 = split_text_into_lines(linebreak_2, max_width)
+		local n = #lines_1
+		for i, v in ipairs(lines_2) do
+			lines_1[n + i] = v
+		end
+		return lines_1
+	end
+	
 	local font_resource = gui_get_font_resource(gui_get_font(current.node))
-	local options = {line_break = true}
+	local options = {line_break = false, tracking = current.tracking, leading = current.leading}
 	local metrics = resource_get_text_metrics(font_resource, text, options)
 	local lines = 1
 	local first = true
 	local text_table = {}
 	text_table[1] = ""
 	local next_word
-	while(metrics.width > max_width and next_word ~= "") do
+	--while(metrics.width > max_width and next_word ~= "") do
+	while(metrics.width > max_width) do
 		local next_space = get_next_space(text)
 		next_word = string_sub(text, 0, next_space)
 		local line_metrics = resource_get_text_metrics(font_resource, text_table[lines]..next_word, options)
@@ -294,6 +305,8 @@ function M.new(options)
 	new.letter_fadein = options.letter_fadein or 0.2
 	new.letter_fadeout = options.letter_fadeout or 0.2
 	new.line_spacing_scale = options.line_spacing_scale or 1
+	new.tracking = options.tracking or 0
+	new.leading = options.leading or 1
 	new.zoom_speed = 0.15
 	new.scale = 1
 	new.node = nil
@@ -324,6 +337,8 @@ function M.set_options(options)
 	current.letter_fadeout = options.letter_fadeout or current.letter_fadeout
 	current.line_spacing_scale = options.line_spacing_scale or current.line_spacing_scale
 	current.zoom_speed = options.zoom_speed or current.zoom_speed
+	current.tracking = options.tracking or current.tracking
+	current.leading = options.leading or current.leading
 end
 
 -- Initialize typewriter on node_id, optional options.
@@ -422,18 +437,26 @@ function M.reposition()
 	end
 end 
 
-function M.redraw()
+function M.redraw(instant)
 	delete_letters()
 	if instant_text then 
 		M.set_instant_text(instant_text)
 	end
 	if current.state == "empty" then return end
-	start_typewriter(current.text, true)
+	start_typewriter(current.text, instant)
 end
 
 function M.set_scale(scale)
 	current.scale = scale
 	gui_set_scale(current.parent, v3(scale, scale, 1))
+end
+
+function M.set_color(color)
+	current.color = color
+	gui.set_color(current.node, color)
+	for k, node in pairs(current.letter_nodes) do
+		gui.set_color(node, color)
+	end
 end
 
 -- Change zoom of text while keeping same line width.

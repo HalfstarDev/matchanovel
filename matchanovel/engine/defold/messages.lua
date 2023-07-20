@@ -11,6 +11,8 @@ local defold_objects = {
 	sound = "sound#sound",
 	debug = "debug",
 	title = "title#title",
+	particles_back = "particles_back#particles",
+	particles_front = "particles_front#particles",
 }
 
 -- Defold function to post message to objects

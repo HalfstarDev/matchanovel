@@ -165,6 +165,7 @@ local function hex_to_dec(hex)
 end
 
 function M.hex_to_rgb(hex)
+	if not type(hex) == "string" then return false end
 	local r_hex, g_hex, b_hex = string.match(hex, "^#(%w%w)(%w%w)(%w%w)")
 	if r_hex and g_hex and b_hex then
 		local r = hex_to_dec(r_hex)/255
@@ -178,7 +179,8 @@ end
 
 function M.string_to_color(s)
 	if not s then return end
-
+	if s.x and s.y and s.z then return s end
+	
 	local r, g, b = M.hex_to_rgb(s)
 	if r and g and b then
 		return vmath.vector4(r, g, b, 1)

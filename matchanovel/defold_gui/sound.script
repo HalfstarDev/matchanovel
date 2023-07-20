@@ -1,11 +1,21 @@
 local save = require "matchanovel.save"
+local _fmod = require "matchanovel.fmod"
+
+
+
+
+local audio_sources = {}
+
+
 
 local function set_volume_bgm(volume)
-	sound.set_group_gain(hash("bgm"), volume)
+	local volume_music = save.get_var("music.volume") or 1
+	sound.set_group_gain(hash("bgm"), volume * volume_music)
 end
 
 local function set_volume_sfx(volume)
-	sound.set_group_gain(hash("sfx"), volume)
+	local volume_sound = save.get_var("music.sound") or 1
+	sound.set_group_gain(hash("sfx"), volume * volume_sound)
 end
 
 local function play(self, url)
@@ -19,7 +29,7 @@ end
 
 local function start_bgm(self, name)
 	if self.bgm ~= name then 
-		save.set_var("sound.bgm", name)
+		save.set_var("music.current", name)
 		if self.bgm then 
 			local old = self.bgm
 			self.bgm = name
@@ -37,7 +47,9 @@ local function stopped(self)
 end
 
 local function stop(self)
-	go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped)
+	if self.bgm then
+		go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped)
+	end
 end
 
 local function stopped_music(self, url)
@@ -46,31 +58,128 @@ local function stopped_music(self, url)
 end
 
 local function stop_music(self)
-	go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped_music)
+	if self.bgm then
+		go.animate("#"..self.bgm, "gain", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_INOUTSINE, 0.15, 0, stopped_music)
+	end
 end
 
 local function stop_sound(self)
 end
 
-local function sfx(self, id)
-	sound.play("#"..id)
+local function sfx(self, id, speed, pan, source)
+	local statement_fmod_event = save.get_var(id..".fmod.event")
+	local statement_sound = save.get_var(id..".sound")
+	local sound_source = save.get_var(id..".sound.source")
+	if statement_fmod_event then
+		_fmod.statement(id, {audio_type = "sound"})
+	elseif statement_sound then
+		if sound_source then
+			if audio_sources[sound_source] then
+				pan = audio_sources[sound_source] or pan or 0
+			else
+				-- TODO: check if source refers to position variable, and use it for pan
+			end
+		end
+		local url = "#"..statement_sound
+		local play_properties = {
+			speed = speed or 1,
+			pan = pan or 0,
+		}
+		sound.play(url, play_properties)
+	else
+		if source then
+			if audio_sources[source] then
+				pan = audio_sources[source] or pan or 0
+			end
+		end
+		local url = "#"..id
+		local play_properties = {
+			speed = speed or 1,
+			pan = pan or 0,
+		}
+		sound.play(url, play_properties)
+	end
 end
 
 local function action_play(id)
 	sound.get_groups()
 end
 
-
-
-
-function init(self)
-	local volume_master = save.get_var("sound.volume_master")
-	if volume_master then 
-		sound.set_group_gain(hash("master"), volume_master)
+local function get_pan(pan_x)
+	local pan_distance = save.get_var("audio.pan_distance") or 1
+	local pan = pan_x * pan_distance
+	if save.get_var("audio.swap_pan") then
+		pan = -pan
 	end
+	return pan
+end 
+
+local function set_repeat(self, id, repeats, space, speed, pan, channel, source)
+	local t = 0
+	if self.repeats_table[channel] then
+		t = self.repeats_table[channel].t
+	end
+	self.repeats_table[channel] = {
+		id = id,
+		repeats = repeats,
+		space = space,
+		speed = speed,
+		t = t,
+		--pan = pan,
+		--pan = -1,
+		source = source,
+	}
+end
+
+local function update_repeats(self, dt)
+	--pprint(self.repeats_table)
+	for channel, v in pairs(self.repeats_table) do
+		if v.t <= 0 then
+			--print(v.t)
+			--pprint(v)
+			local pan_x = audio_sources[v.source] or v.pan or 0
+			local pan = get_pan(pan_x)
+			sfx(self, v.id, v.speed, pan)
+			v.repeats = v.repeats - 1
+			v.t = v.space
+		elseif v.repeats > 0 then
+			v.t = v.t - dt
+		else
+			self.repeats_table[channel] = nil
+		end
+	end
+end
+
+local function set_audio_source(id, pan_x)
+	local pan = get_pan(pan_x)
+	audio_sources[id] = pan
+	if fmod then
+		_fmod.set_audio_source(id, pan)
+	end
+end
+
+local function set_master_volume(volume)
+	volume = volume or save.get_var("audio.volume") or 1
+	if volume then
+		sound.set_group_gain(hash("master"), volume)
+	end
+end
+
+
+
+function init(self)	
+	set_master_volume()
 	sound.set_group_gain(hash("bgm"), 1)
 	sound.set_group_gain(hash("sfx"), 1)
+	self.repeats_table = {}
 	--msg.post("#", "play_music", {id = "bgm"})
+end
+
+function update(self, dt)
+	update_repeats(self, dt)
+	if fmod then
+		_fmod.update()
+	end
 end
 
 function on_message(self, message_id, message, sender)
@@ -81,13 +190,16 @@ function on_message(self, message_id, message, sender)
 			start_bgm(self, message.id)
 		end
 	elseif message_id == hash("play_sfx") then
-		sfx(self, message.id)
+		sfx(self, message.id, nil, nil, message.source)
 	elseif message_id == hash("play_voice") then
 		sfx(self, message.id)
+	elseif message_id == hash("repeat_sfx") then
+		set_repeat(self, message.id, message.repeats, message.space, message.speed, message.pan, message.channel, message.source)
 	elseif message_id == hash("stop_music") then
 		stop_music(self)
 	elseif message_id == hash("stop_sound") then
 		stop_sound(self)
+	elseif message_id == hash("stop_repeat") then
 	elseif message_id == hash("stop") then
 		stop(self)
 	elseif message_id == hash("sfx") then
@@ -95,9 +207,20 @@ function on_message(self, message_id, message, sender)
 	elseif message_id == hash("set_volume_bgm") then
 		set_volume_bgm(message.volume)
 	elseif message_id == hash("set_volume_sfx") then
-		--set_volume_sfx(message.volume)
+		set_volume_sfx(message.volume)
+	elseif message_id == hash("set_audio_source") then
+		set_audio_source(message.id, message.pan_x)
+	elseif message_id == hash("action_set") then
+		if message.name == "audio.volume" then
+			set_master_volume()
+		elseif message.name == "music.volume" then
+		elseif message.name == "sound.volume" then
+		end
 	elseif message_id == hash("start") then
-		local bgm = save.get_var("sound.bgm")
+		set_master_volume()
+	elseif message_id == hash("loaded") then
+		set_master_volume()
+		local bgm = save.get_var("music.current")
 		if bgm then
 			start_bgm(self, bgm)
 		end

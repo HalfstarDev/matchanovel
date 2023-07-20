@@ -1,0 +1,443 @@
+
+label start
+
+scene river
+play music bgm
+
+This is an example project for MatchaNovel.
+
+show c
+c: MatchaNovel is a visual novel framework for the Defold game engine.
+
+
+
+label select
+
+move c pos_right duration=1
+c: Which feature to you want to see?
+
+> General
+  jump general
+> Variables and code
+  jump logic
+> Scenes and transitions
+  jump scenes
+> Sprites
+  jump character_sprites
+> Particles and weather
+  jump weather
+> Extensions and pronouns
+  jump pronoun_extension
+> Sounds
+  jump play_sounds
+
+
+
+
+
+label general
+
+To create your own story, you can write a script in the file \assets\scripts\script.txt
+To see how the features in this demo are done, you can take a look at the script in the folder of this application.
+The script will start at "label start", and go down one line each step, waiting for user input where it is needed.
+On jump actions the script will continue at the given label, so "jump xyz" will continue the script at the line "label xyz".
+
+And all lines without any action command, like this one, will simply display the text as you can see now.
+
+
+
+jump select
+
+
+label logic
+move c pos_center
+
+y = 4
+x = 111 + y * (2 + 1)
+c: You can use variables in text by putting them into curly brackets like this: The value of x is {x}.
+
+abc = "test"
+c: Declare variable names with lower letters. If you call strings with a capitalized name, it will also do so in print: {abc} {Abc} {ABC}
+
+c: You can even put lua expressions in there.
+c: 97*63={97*63}. Random number from 1 to 100: {math.random(1,100)}. You are running this demo on {system.name}. It's {system.time_hour}:{system.time_minute}.
+c: Is x larger than or equal to 9? {x >= 9 and "Yes" or "No"}.
+c: Turn all vowels in this sentence into stars: {string.gsub("Turn all vowels in this sentence into stars", "[AIUEOaiueo]", "*")}
+c: Reverse this sentence: {string.reverse("Reverse this sentence")}
+c: Scream in all caps: {string.upper("Scream in all caps")}
+c: Repeat ha 30 times:{string.rep(" ha", 30)}.
+
+jump select
+
+
+
+
+
+label scenes
+move c pos_center
+
+c: The following predefined transitions for scenes exist:
+
+scene bridge transition=insant
+instant
+
+scene river transition = fade
+fade
+
+scene bridge transition=fade_to_black
+fade_to_black
+
+scene river transition=shrink
+shrink
+
+scene bridge transition = grow
+grow
+
+scene river transition=grow_horizontal
+grow_horizontal
+
+scene bridge transition = grow_vertical
+grow_vertical
+
+scene river transition=zoom_out
+zoom_out
+
+scene bridge transition = zoom_in
+zoom_in
+
+scene river transition=slide_horizontal
+slide_horizontal
+
+scene bridge transition=slide_vertical
+slide_vertical
+
+scene river transition = slide_vertical_reverse
+slide_vertical_reverse
+
+scene bridge transition = slide_horizontal_reverse
+slide_horizontal_reverse
+
+scene river transition=fade
+c: These are all transition types for now.
+
+c: You can also change the duration of an animation directly.
+
+scene.transition = "fade"
+scene bridge duration=0.5
+c: You can change it one time for a single transition like: scene room.jpg duration=0.5
+
+scene.duration = 0.5
+scene river
+c: Or you can change it permanently by globally setting scene.duration = 0.5
+
+-- return settings to default
+scene.duration = nil
+scene.transition = nil
+
+scene bridge transition=fade duration=0.2
+c: So a transition could be either fast...
+
+scene river transition=fade duration=1
+c: or slow.
+
+scene river transition=fade duration=1 color=#88FF88
+c: You can also tint the images.
+
+scene teal transition=fade duration=1
+c: If you use a color name or a hex color as the name of the scene, you can use a solid color instead of an image.
+c: HTML colors are predefined, but you can define your own.
+
+scene bridge transition=fade
+c: You can also change the color of transitions with transition_color. Let's use fade_to_black, but change it to red:
+
+scene river transition=fade_to_black transition_color=red
+c: Like with tints, you can use color names or hex colors.
+
+jump select
+
+
+
+
+
+
+label character_sprites
+hide c
+
+c: You can associate a sprite with an object (like a character) by giving it the property 'sprite', with the filename as value.
+
+c.sprite = "chloe.png"
+c: To give a character named c a sprite, use: c.sprite = filename
+
+c: Character sprites can be shown, hidden, or moved.
+
+show c at=pos_right
+c: 'Show' will show the sprite at the position given by 'at'.
+
+hide c transition=move_down
+c: 'Hide' will apply a given transition (optionally), and then remove the sprite.
+
+show c
+c: If you show a sprite without a position, it will be positioned automatically according to the sprites.auto_* variables.
+
+show s1
+show s2
+c: With the default settings, multiple sprites without a position will be shown next to each other, and rearrange the old sprites as well.
+
+show s3 at=pos_back
+c: But sprites with a manual position will not move the automatically ordered sprites.
+c: And as you can see with sprite 3, positions can also have a scale, which will multiply with the sprite scale.
+
+hide s2
+hide s3
+
+c: To change the image of a shown character, you can just change its sprite variable, like s1.sprite = "sprite_2.png".
+
+s1.sprite = "sprite_2.png"
+c: This will change the sprite immediately and permanently.
+
+s1.sprite = "sprite_1.png"
+c: To make changing sprites easier, the expression system exists.
+c: You can define an expression for a character by using subvariables, like: s1.three.sprite = "sprite_3.png"
+
+s1.three
+c: If you now call that expression with s1.three, the character s1 will change its expression to three, which means it will change its sprite to sprite_3.png.
+
+s1.one
+c: If an expression is used in its own line, it will stay until changed again.
+
+s1.two: You can also use an expression on the speaker of a "say" line. In this case, the sprite will change as well, but only for this one line.
+
+s1: So the next line it will revert again.
+
+hide s1
+
+
+Regarding movements, you can also set the easing of an animation.
+
+move c to=pos_right
+If you set no easing, a smooth easing will be used by default, InOutSine.
+
+move c to=pos_left easing=Linear
+But you could also change it to a linear easing.
+
+move c to=pos_right easing=OutBounce duration=1
+Or a bouncing movement.
+
+Do you want to see a demonstration of all easings? There are 41, so it will take a while.
+
+> No, I'm fine.
+  jump select
+> Sure, show all 41 easings.
+  move.duration = 2
+  move c to=pos_left easing=LINEAR
+  LINEAR
+  move c to=pos_right easing=INBACK
+  INBACK
+  move c to=pos_left easing=EASING_OUTBACK
+  EASING_OUTBACK
+  move c to=pos_right easing=INOUTBACK
+  INOUTBACK
+  move c to=pos_left easing=OUTINBACK
+  OUTINBACK
+  move c to=pos_right easing=INBOUNCE
+  INBOUNCE
+  move c to=pos_left easing=OUTBOUNCE
+  OUTBOUNCE
+  move c to=pos_right easing=INOUTBOUNCE
+  INOUTBOUNCE
+  move c to=pos_left easing=OUTINBOUNCE
+  OUTINBOUNCE
+  move c to=pos_right easing=INELASTIC
+  INELASTIC
+  move c to=pos_left easing=OUTELASTIC
+  OUTELASTIC
+  move c to=pos_right easing=INOUTELASTIC
+  INOUTELASTIC
+  move c to=pos_left easing=OUTINELASTIC
+  OUTINELASTIC
+  move c to=pos_right easing=INSINE
+  INSINE
+  move c to=pos_left easing=OUTSINE
+  OUTSINE
+  move c to=pos_right easing=INOUTSINE
+  INOUTSINE
+  move c to=pos_left easing=OUTINSINE
+  OUTINSINE
+  move c to=pos_right easing=INEXPO
+  INEXPO
+  move c to=pos_left easing=OUTEXPO
+  OUTEXPO
+  move c to=pos_right easing=INOUTEXPO
+  INOUTEXPO
+  move c to=pos_left easing=OUTINEXPO
+  OUTINEXPO
+  move c to=pos_right easing=INCIRC
+  INCIRC
+  move c to=pos_left easing=OUTCIRC
+  OUTCIRC
+  move c to=pos_right easing=INOUTCIRC
+  INOUTCIRC
+  move c to=pos_left easing=OUTINCIRC
+  OUTINCIRC
+  move c to=pos_right easing=INQUAD
+  INQUAD
+  move c to=pos_left easing=OUTQUAD
+  OUTQUAD
+  move c to=pos_right easing=INOUTQUAD
+  INOUTQUAD
+  move c to=pos_left easing=OUTINQUAD
+  OUTINQUAD
+  move c to=pos_right easing=INCUBIC
+  INCUBIC
+  move c to=pos_left easing=OUTCUBIC
+  OUTCUBIC
+  move c to=pos_right easing=INOUTCUBIC
+  INOUTCUBIC
+  move c to=pos_left easing=OUTINCUBIC
+  OUTINCUBIC
+  move c to=pos_right easing=INQUART
+  INQUART
+  move c to=pos_left easing=OUTQUART
+  OUTQUART
+  move c to=pos_right easing=INOUTQUART
+  INOUTQUART
+  move c to=pos_left easing=OUTINQUART
+  OUTINQUART
+  move c to=pos_right easing=INQUINT
+  INQUINT
+  move c to=pos_left easing=OUTQUINT
+  OUTQUINT
+  move c to=pos_right easing=INOUTQUINT
+  INOUTQUINT
+  move c to=pos_left easing=OUTINQUINT
+  OUTINQUINT
+  move.duration = nil
+  That were all easings.
+  jump select
+jump select
+
+
+
+
+
+
+label weather
+move c pos_center
+
+scene.weather = "fireflies"
+c: You can create particle effects in the Defold editor, like these fireflies.
+c: One predefined slot for particles is the "weather" slot. If you change its name, it will create the associated particles.
+
+scene.weather = "rain"
+c: This sets the weather to rain.
+c: I like looking at rain through the window and feeling sad so much, that if it doesn't rain, I look for rain videos online.
+c: It's just not the same to sit in your room and sigh at the window if the sun is shining.
+
+scene.weather = "snow"
+c: This sets the weather to snow.
+c: And the final effect is- oh damn it, why did I volunteer to present some tech demo...
+
+scene.weather = "blizzard"
+c: It's a blizzard!
+
+scene.weather = "none"
+c: This turns off weather effects.
+
+scene.weather = "snow"
+c: Let's get the snow back. Instead of only turning off the creation of new particles, you can also clear them all immediately...
+
+scene.weather = "clear"
+c: ...by setting the weather to "clear".
+
+jump select
+
+
+
+
+
+label pronoun_extension
+move c pos_center
+
+c: MatchaNovel can be extended with Lua modules.
+c: As an example, the pronoun system is implemented as a Lua extension.
+c: Let's try it. Pick your pronouns from these:
+
+> she/her
+  pronouns = "she"
+> he/him
+  pronouns = "he"
+> they/them
+  pronouns = "they"
+
+c: Now people will use the correct pronouns, like this:
+"Did {they} change {their} hair style? {They} look{verb_end} amazing now." "{THEY} {plural and "DO" or "DOES"}!"
+c: As you can see in the code, this also works for capitalization, regular verb ends, and to pick singular or plural options for irregular verbs.
+
+a.name = "Alice"
+a.pronouns = "she"
+b.name = "Bob"
+b.pronouns = "he"
+c: If you have variable pronouns for multiple characters, you can also link those to a name. Example: {a.name} prefers {a.they}, {b.name} prefers {b.they}.
+
+jump select
+
+
+
+
+
+
+label play_sounds
+move c pos_center
+
+You can define sounds in the sound.go file.
+
+play sound snare
+c: To play a sound, you can use "play sound sound_name"
+
+show s1 at=pos_left
+show s2 at=pos_right
+c: You can also have a sound originate from a character by setting the source argument.
+
+play sound snare source=s1
+So if a character is currently located on the left, the sound will also come from the left speaker.
+
+play sound snare source=s2
+And it will come from the right speaker if the character is on the right.
+
+hide s1
+hide s2
+
+jump select
+
+
+
+
+label spine_example
+move c pos_center
+
+c: You can also add spine animations to your visual novel.
+
+show owl
+c: Like this.
+
+c: Don't look at me like that. I know, I know, the Spine developers got an actual artist for their demo.
+
+hide owl
+
+jump select
+
+
+
+
+
+-- you can set a variable to a color with a HTML color name or a hex code
+color_sky_night.color = "MidnightBlue"
+color_sky_fog.color = #E0E0F0
+
+-- you can also set the color values separately for red, green and blue with values from 0 to 1
+color_sky_day.r = 0.52
+color_sky_day.g = 0.80
+color_sky_day.b = 0.98
+
+
+

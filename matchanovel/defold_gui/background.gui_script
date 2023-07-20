@@ -4,8 +4,8 @@ local images = require "matchanovel.defold_gui.images"
 
 
 
-local display_width = tonumber(sys.get_config("display.width"))
-local display_height = tonumber(sys.get_config("display.height"))
+local display_width = tonumber(sys.get_config_int("display.width", 960))
+local display_height = tonumber(sys.get_config_int("display.height", 520))
 
 local loaded_textures = {}
 
@@ -29,24 +29,32 @@ local function set_scene_color(color)
 	gui.set_color(current_node, color)
 end
 
-local function create_image_scene(image_name)
+local function get_filepath(image_name)
 	local first = string.sub(image_name, 1, 1)
-	local filepath
 	if first == "/" or first == "." then
-		filepath = image_name
+		return image_name
 	else
-		filepath = "/assets/images/background/"..image_name
+		return "/assets/images/background/"..image_name
 	end
-	images.set_gui_sprite(loaded_textures, current_node, filepath)
+end
+
+local function create_image_scene(image_name)
+	local filepath = get_filepath(image_name)
+	return images.set_gui_sprite(loaded_textures, current_node, filepath)
 end
 
 local function get_color(name)
 	return colors.get_color(name)
 end
 
+local function get_image_name(scene)
+	return save.get_var(scene..".image") or save.get_var(scene) or scene
+end
+
 local function create_new_scene(scene, color)
 	delete_node(_, old_node)
 	old_node = current_node
+	
 	current_node = gui.clone(gui.get_node("background"))
 	gui.set_enabled(current_node, true)
 	gui.set_alpha(current_node, 1)
@@ -54,9 +62,35 @@ local function create_new_scene(scene, color)
 	local scene_name_color = get_color(scene)
 	if scene_name_color then
 		set_scene_color(scene_name_color)
+		local stub_text = gui.get_node("stub_text")
+		gui.set_enabled(stub_text, false)
 	else
-		create_image_scene(scene)
+		local image_name = get_image_name(scene)
+		local image_found = create_image_scene(image_name)
+		if image_found then
+			local stub_text = gui.get_node("stub_text")
+			gui.set_enabled(stub_text, false)
+		else
+			local stub_text = gui.get_node("stub_text")
+			gui.set_enabled(stub_text, true)
+			gui.set_text(stub_text, scene)
+			local stub_color = save.get_var("background.stub_color")
+			if stub_color then
+				set_scene_color(stub_color)
+			end
+			--[[
+			local stub_text = gui.clone(gui.get_node("stub_text"))
+			gui.set_enabled(stub_text, true)
+			gui.set_parent(stub_text, current_node, false)
+			gui.set_text(stub_text, scene)
+			local stub_color = save.get_var("background.stub_color")
+			if stub_color then
+				set_scene_color(stub_color)
+			end
+			--]]
+		end
 	end
+	
 	if color then
 		local tint_color = get_color(color)
 		if tint_color then
@@ -207,45 +241,7 @@ local function load_scene()
 	end
 end
 
-
-
--- Weather
-
-local function clear_weather()
-	gui.stop_particlefx(gui.get_node("weather_particles"), { clear = true })
-	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
-end
-
-local function stop_weather()
-	gui.stop_particlefx(gui.get_node("weather_particles"))
-	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
-end
-
-local function start_fog()
-	gui.animate(gui.get_node("weather_color"), "color.w", 0.5, gui.EASING_INOUTSINE, 3, 0, start_fog, gui.PLAYBACK_LOOP_PINGPONG)
-end
-
-
-local function change_weather(weather)
-	local node = gui.get_node("weather_particles")
-	gui.stop_particlefx(node)
-	gui.set_particlefx(node, weather)
-	gui.play_particlefx(node)
-	if weather == "blizzard" then
-		gui.animate(gui.get_node("weather_color"), "color.w", 0.3, gui.EASING_INOUTSINE, 0.2, 0, start_fog)
-	else
-		gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
-	end
-end
-
-local function set_weather(weather)
-	if weather == "none" then
-		stop_weather()
-	elseif weather == "clear" then
-		clear_weather()
-	elseif weather then 
-		change_weather(weather)
-	end
+local function create_stub(scene)
 end
 
 
@@ -262,20 +258,27 @@ end
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("scene") then
-		gui.set_enabled(gui.get_node("background_default"), false) 
+		gui.set_enabled(gui.get_node("background_default"), false)
 		action_scene(message.scene, message.transition, message.duration, message.color,  message.transition_color)
+		if message.stub then
+			--create_stub(message.scene)
+		else 
+		end
 	elseif message_id == hash("action_set") then 
 		if message.name == "scene.weather" then
-			set_weather(message.value or message.value_string)
+			--	set_weather(message.value or message.value_string)
+			msg.post("particles_back", "set_weather", message)
 		end
 	elseif message_id == hash("set_render_order") then 
 		gui.set_render_order(message.n)
 	elseif message_id == hash("loaded") then
 		load_scene()
-		clear_weather()
-		local weather = save.get_var("scene.weather")
-		if weather then 
-			set_weather(weather)
-		end
+		--clear_weather()
+		--local weather = save.get_var("scene.weather")
+		--if weather then 
+		--	set_weather(weather)
+		--end
+	elseif message_id == hash("unload") then
+		action_scene("#000000", nil, 0, nil, nil)
 	end
 end

@@ -1,0 +1,9 @@
+function init(self)
+	gui.set_render_order(15)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_render_order") then 
+		gui.set_render_order(message.n)
+	end
+end

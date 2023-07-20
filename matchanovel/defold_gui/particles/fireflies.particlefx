@@ -2,7 +2,7 @@ emitters {
   id: "back"
   mode: PLAY_MODE_LOOP
   duration: 1.0
-  space: EMISSION_SPACE_WORLD
+  space: EMISSION_SPACE_EMITTER
   position {
     x: 0.0
     y: 0.0
@@ -277,6 +277,11 @@ emitters {
   duration_spread: 0.0
   stretch_with_velocity: false
   start_offset: 0.0
+  pivot {
+    x: 0.0
+    y: 0.0
+    z: 0.0
+  }
 }
 modifiers {
   type: MODIFIER_TYPE_VORTEX

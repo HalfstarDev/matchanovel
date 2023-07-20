@@ -11,10 +11,6 @@ fonts {
   name: "dyslexia"
   font: "/matchanovel/defold_gui/fonts/dyslexia.font"
 }
-textures {
-  name: "atlas"
-  texture: "/matchanovel/defold_gui/atlas_matchanovel.atlas"
-}
 background_color {
   x: 0.0
   y: 0.0
@@ -59,7 +55,7 @@ nodes {
   xanchor: XANCHOR_NONE
   yanchor: YANCHOR_NONE
   pivot: PIVOT_CENTER
-  adjust_mode: ADJUST_MODE_STRETCH
+  adjust_mode: ADJUST_MODE_FIT
   layer: ""
   inherit_alpha: true
   slice9 {
@@ -77,6 +73,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -116,7 +113,7 @@ nodes {
   xanchor: XANCHOR_NONE
   yanchor: YANCHOR_NONE
   pivot: PIVOT_CENTER
-  adjust_mode: ADJUST_MODE_STRETCH
+  adjust_mode: ADJUST_MODE_FIT
   parent: "gui"
   layer: ""
   inherit_alpha: true
@@ -135,6 +132,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -193,6 +191,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -251,6 +250,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -309,6 +309,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -367,6 +368,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: false
+  material: ""
 }
 nodes {
   position {
@@ -425,6 +427,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: true
+  material: ""
 }
 nodes {
   position {
@@ -483,6 +486,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: true
+  material: ""
 }
 nodes {
   position {
@@ -549,6 +553,7 @@ nodes {
   custom_type: 0
   enabled: true
   visible: true
+  material: ""
 }
 material: "/builtins/materials/gui.material"
 adjust_reference: ADJUST_REFERENCE_PARENT

@@ -1,18 +1,29 @@
 local matchanovel = require "matchanovel.matchanovel"
 local settings = require "matchanovel.settings"
 local save = require "matchanovel.save"
+local theme = require "matchanovel.theme"
+local images = require "matchanovel.defold_gui.images"
 
 
 local HASH_TOUCH = hash("touch")
 local HASH_MENU = hash("menu")
 local HASH_BACK = hash("back")
 local HASH_FORWARD = hash("forward")
+local HASH_MIDDLE = hash("middle")
 
-local save_slots_per_page = 4
+local save_slots_per_page = 6
 local save_page_max = 9
+local save_page_duration = 0.15
+local save_page_animation_x = 0
 
 local active = false
+local active_frames = false
 local active_menu = false
+local paused_menu = false
+--local starting = true
+local transition = false
+local title = false
+local pause = false
 
 local pressed = false
 local pressed_slider = false
@@ -24,13 +35,83 @@ local pressed_save = false
 local save_page = 1
 local save_written = {}
 
+local tabs = {}
+local current_tab_list
+local tab_distance = 4
+local rotate_pages_direction = 1
+local page_rotation_angle = 20
+local highlight = false
+local selected_tab
+local pressed_log_slider_button = false
+local scrolling_log = false
+local scroll_log_target = false
+local current_drawn_log = false
+local save_scroll  = false
+local save_scroll_width = 128
+local save_page_animating = false
+local touch_distance = 0
+local touch_distance_max = 16
+local touch_distance_max_reached = false
+local changed_sprites = {}
+local using_buttons_for_tabs = false
+local using_buttons_for_page = false
+local save_slots_x = 3
+local save_slots_y = 2
+local quit_title_hovered
+local quit_hovered
+local pressing_title = false
 
+local tab_lists = {
+	pause = {
+		"continue",
+		--"characters",
+		"log",
+		"save",
+		"load",
+		"settings",
+		--"extras",
+		"quit",
+	},
+	title = {
+		"start",
+		"load",
+		"settings",
+		"quit_title",
+	}
+}
+
+local tab_names = {
+	start = "Start",
+	continue = "Continue",
+	save = "Save",
+	load = "Load",
+	settings = "Settings",
+	log = "Log",
+	quit = "Quit",
+	quit_title = "Quit",
+	characters = "Characters",
+	extras = "Extras",
+}
 
 local sliders = {
 	"text_speed",
 	"auto_speed",
 	"volume_music",
 	"volume_sound",
+}
+
+local pages = {
+	save = "save",
+	load = "save",
+	settings = "settings",
+	quit = "quit",
+	title = "title",
+	quit_title = "quit_title",
+	log = "log",
+	extras = "extras",
+	characters = "characters",
+	continue = "continue",
+	start = "start",
 }
 
 --[[
@@ -54,6 +135,7 @@ local option_names = {"font", "skip_all", "fullscreen"}
 
 local options = {}
 options.font = {"serif", "sans", "dyslexia"}
+options.theme = {"default", "dark", "light", "dyslexia"}
 options.skip_all = {false, true}
 options.fullscreen = {true, false}
 
@@ -61,69 +143,784 @@ options.fullscreen = {true, false}
 local slider_value = {0.5, 0.5, 0.5, 0.5}
 local picked_option = {0, 0, 0}
 
+
+local function get_tab_rotation(i, n)
+	if i and n then 
+		return tab_distance * (i - (n + 1) / 2)
+	else
+		return 25
+	end
+end
+
+local function get_tab_y(i)
+	if i then 
+		return gui.get_position(gui.get_node("tab_"..i)).y
+	else
+		return 600
+	end
+end
+
+local function animate_tab_select(tab)
+	local node = gui.get_node("tab_select")
+	gui.animate(node, "position.y", get_tab_y(tab), gui.EASING_INOUTSINE, 0.2)
+	gui.set_enabled(node, true)
+end
+
+local function set_tab_select()
+	local node = gui.get_node("tab_select")
+	gui.cancel_animation(node, "position.y")
+	for k, v in pairs(tabs) do
+		if v == paused_menu then
+			active_menu = v
+			local position = gui.get_position(node)
+			position.y = get_tab_y(k)
+			gui.set_position(node, position)
+			gui.set_enabled(node, true)
+			return
+		end
+	end
+	local position = gui.get_position(node)
+	position.y = get_tab_y()
+	gui.set_position(node, position)
+end
+
+local function show_tabs(duration)
+	local node = gui.get_node("tabs")
+	local x = -960
+	if duration then
+		gui.animate(node, "position.x", x, gui.EASING_INOUTSINE, duration)
+	else
+		local position = gui.get_position(node)
+		position.x = x
+		gui.set_position(node, position)
+	end
+end
+
+local function hide_tabs(duration)
+	local node = gui.get_node("tabs")
+	local x = -1470
+	if duration then
+		gui.animate(node, "position.x", x, gui.EASING_INOUTSINE, duration)
+	else
+		local position = gui.get_position(node)
+		position.x = x
+		gui.set_position(node, position)
+	end
+end
+
+local function set_tabs(id)
+	current_tab_list = id
+	local list = tab_lists[id]
+	for i = 1, #tabs do
+		gui.set_enabled(gui.get_node("tab_"..i), false)
+	end
+	tabs = {}
+	for i, tab in ipairs(list) do
+		local tab_text = tab_names[tab] or tab
+		tabs[i] = tab
+		gui.set_enabled(gui.get_node("tab_"..i), true)
+		gui.set_text(gui.get_node("tab_text_"..i), tab_text)
+	end
+
+	set_tab_select(tab)
+
+	local node = gui.get_node("tab_select")
+	gui.cancel_animation(node, "position.y")
+	gui.set_enabled(node, false)
+	for k, tab in pairs(tabs) do
+		if tab == paused_menu then
+			local y = get_tab_y(k)
+			if y then
+				local position = gui.get_position(node)
+				position.y = y
+				gui.set_position(node, position)
+				gui.set_enabled(node, true)
+			end
+			selected_tab = k
+			active_menu = tab
+			return
+		end
+	end
+end
+
+local function enable_current_page()
+	local id = pages[active_menu]
+	for k, page in pairs(pages) do
+		gui.set_enabled(gui.get_node(page), id and id == page)
+	end
+end
+
+local function unhover_save()
+	if save_hovered then
+		local node_slot = gui.get_node("save_"..save_hovered.."/slot")
+		local node_hover = gui.get_node("save_"..save_hovered.."/hover")
+		--local node_texture = gui.get_node("save_"..save_hovered.."/texture")
+		gui.animate(node_slot, "scale", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.25)
+		gui.animate(node_hover, "color.w", 0, gui.EASING_INOUTSINE, 0.25)
+		--gui.animate(node_texture, "color.w", 1, gui.EASING_INOUTSINE, 0.25)
+		save_hovered = false
+	end
+end
+
+local function hover_save(slot, mute)
+	unhover_save()
+	if save_hovered == slot then return end
+	save_hovered = slot
+	local node_slot = gui.get_node("save_"..slot.."/slot")
+	local node_hover = gui.get_node("save_"..slot.."/hover")
+	local node_hover_color = gui.get_node("save_"..slot.."/hover_color")
+	--local node_texture = gui.get_node("save_"..slot.."/texture")
+	gui.animate(node_slot, "scale", vmath.vector3(1.1, 1.1, 1), gui.EASING_INOUTSINE, 0.25)
+	gui.animate(node_hover, "color.w", 1, gui.EASING_INOUTSINE, 0.25)
+	gui.animate(node_hover_color, "color.w", theme.get("alpha_save_hover"), gui.EASING_INOUTSINE, 0.25)
+	--gui.animate(node_texture, "color.w", 0, gui.EASING_INOUTSINE, 0.25)
+	if not mute then
+		matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+	end
+end
+
+local function unpress_save()
+	if pressed_save then
+		local node_zoom = gui.get_node("save_"..pressed_save.."/zoom")
+		gui.animate(node_zoom, "scale", vmath.vector3(1, 1, 1), gui.EASING_OUTBOUNCE, 0.25)
+		pressed_save = false
+	end
+end
+
+local function press_save(i)
+	unpress_save()
+	pressed_save = i
+	local node_zoom = gui.get_node("save_"..pressed_save.."/zoom")
+	gui.animate(node_zoom, "scale", vmath.vector3(0.8, 0.8, 1), gui.EASING_INOUTSINE, 0.15)
+	matchanovel.post("sound", "play_sfx", {id = "menu_save_press"})
+end
+
+local function scroll_save_page_return()
+	if save_page_animating then return end 
+	local node = gui.get_node("save_scroll")
+	gui.animate(node, "position.x", 0, gui.EASING_OUTSINE, 0.2)
+	gui.animate(node, "color.w", 1, gui.EASING_OUTSINE, 0.2)
+	save_scroll = false
+end
+
 local function show_menu()
 	local node_menu = gui.get_node("menu")
 	gui.set_enabled(node_menu, true)
-	gui.animate(node_menu, "scale.x", 1, gui.EASING_INOUTSINE, 0.2)
-	gui.animate(node_menu, "color.w", 1, gui.EASING_INOUTSINE, 0.2)
+	--gui.animate(node_menu, "scale.x", 1, gui.EASING_INOUTSINE, 0.2)
+	gui.animate(node_menu, "color.w", 1, gui.EASING_INOUTSINE, 0.3)
+	--gui.animate(gui.get_node("menu_back"), "color.w", 1, gui.EASING_INOUTSINE, 0.5)
+	gui.animate(gui.get_node("pages"), "color.w", 1, gui.EASING_INOUTSINE, 0.5)
+	--gui.animate(gui.get_node("cursor"), "color.w", 1, gui.EASING_LINEAR, .1)
+	unhover_save()
+	
+	images.cache_screenshot()
 	active = true
 	matchanovel.showing_menu = true
 end
 
 local function menu_hidden()
 	gui.set_enabled(gui.get_node("menu"), false)
-	gui.set_enabled(gui.get_node("settings"), false)
+	gui.set_enabled(gui.get_node("title"), false)
+	--gui.set_alpha(gui.get_node("cursor"), 1)
+	gui.set_alpha(gui.get_node("tab_highlight"), 0)
+	title = false
+	--enable_current_page()
 end
 
-local function hide_menu()
+local function hide_menu(duration)
 	local node_menu = gui.get_node("menu")
-	gui.animate(node_menu, "scale.x", 0.5, gui.EASING_INOUTSINE, 0.2)
-	gui.animate(node_menu, "color.w", 0, gui.EASING_INOUTSINE, 0.2, 0, menu_hidden)
-	active = false
+	--gui.animate(node_menu, "scale.x", 0.5, gui.EASING_INOUTSINE, 0.2)
+	duration = duration or 0.3
+	gui.animate(node_menu, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, menu_hidden)
+	gui.animate(gui.get_node("pages"), "color.w", 0, gui.EASING_INOUTSINE, duration * 2)
+	gui.animate(gui.get_node("tab_highlight"), "color.w", 0, gui.EASING_LINEAR, 0.2)
+	--gui.animate(gui.get_node("menu_back"), "color.w", 0, gui.EASING_INOUTSINE, duration * 2)
+	hide_tabs(duration)
+	unpress_save()
+	scroll_save_page_return()
+	if active_menu then
+		paused_menu = active_menu
+	end
+	--active = false
+	active_frames = 10
 	active_menu = false
+	pause = false
+	current_drawn_log = false
+	highlight = false
+	using_buttons_for_tabs = false
+	using_buttons_for_page = false
 	matchanovel.showing_menu = false
+	matchanovel.post("textbox", "show_below_menu")
 end
 
 local function show_settings()
 	active_menu = "settings"
-	gui.set_enabled(gui.get_node("settings"), true)
-	gui.set_enabled(gui.get_node("save"), false)
+	enable_current_page()
 	show_menu()
+	show_tabs(0.4)	
 end
 
 local function show_save()
 	active_menu = "save"
-	gui.set_enabled(gui.get_node("save"), true)
-	gui.set_enabled(gui.get_node("settings"), false)
-	gui.set_text(gui.get_node("save_title_text"), "Save")
+	enable_current_page()
+	gui.set_text(gui.get_node("save_title"), "Save")
 	show_menu()
+	show_tabs(0.4)
 end
 
 local function show_load()
 	active_menu = "load"
-	gui.set_enabled(gui.get_node("save"), true)
-	gui.set_enabled(gui.get_node("settings"), false)
-	gui.set_text(gui.get_node("save_title_text"), "Load")
+	enable_current_page()
+	gui.set_text(gui.get_node("save_title"), "Load")
 	show_menu()
+	show_tabs(0.4)
+end
+
+local function show_quit()
+	active_menu = "quit"
+	enable_current_page()
+	show_menu()
+	show_tabs(0.4)
+end
+
+local function show_pause_menu()
+	--active_menu = "quit"
+	--enable_current_page()
+	pause = true
+	set_tabs("pause")
+	show_menu()
+	show_tabs(0.4)
+end
+
+local log_nodes = {}
+local log_box_nodes = {}
+local log_lines = 3
+local log_line = 1
+
+local function set_log_slider_size(h)
+	local minimum = 64
+	local height = gui.get_size(gui.get_node("log_slider_back")).y
+	local y = height * h
+	if y < minimum then
+		y = minimum
+	end
+	local node = gui.get_node("log_slider_button")
+	local size = gui.get_size(node)
+	size.y = y
+	gui.set_size(node, size)
 end
 
 
+local function set_log_slider_position(p)
+	--print(p)
+	local node = gui.get_node("log_slider_button")
+	local height = gui.get_size(gui.get_node("log_slider_back")).y
+	local size = gui.get_size(node).y
+	local max = height / 2 - size / 2
+	local min = - max
+	local position = vmath.vector3(0, 0, 0)
+	position.y = min + (max - min) * p
+	gui.set_position(node, position)
+end
+
+local log_scroll = 0
 
 
-local function apply_slider(name, value)
-	settings.set(name, math.floor(value*100 + 0.5))
-	if name == "text_speed" then
-		msg.post("textbox#textbox", "set_textspeed", {value = value})
-	elseif name == "auto_speed" then
-		msg.post("textbox#textbox", "set_autospeed", {value = value})
-	elseif name == "volume_music" then
-		msg.post("sound#sound", "set_volume_bgm", {volume = value})
-	elseif name == "volume_sound" then
-		msg.post("sound#sound", "set_volume_sfx", {volume = value})
+local function get_log_text_position(i)
+	local screen_w = 1920
+	local screen_h = 1080
+	local width = screen_w*0.6
+	local height = screen_h*0.25
+	local log_free_space = 0.25
+	local distance = screen_h * log_free_space / log_lines
+	local x = -width/2 + screen_w*0.1 
+	local y = height + distance / 2 - screen_h / 2 + (height + distance) * (i - 1)
+	return vmath.vector3(x, y, 0)
+end
+
+
+local function get_log_text(i)
+	local n = matchanovel.get_log_size()
+	if i <= n then
+		-- TODO: name is wrong
+		local text, name = matchanovel.get_log(n - i + 1)
+		if name and #name > 0 and text then
+			return name..": "..text
+		else
+			return text or ""
+		end
+	end
+	return ""
+end
+
+local function get_log_percentage()
+	local screen_h = 1080
+	local n = matchanovel.get_log_size()
+	local n_max = math.max(1, n - 3)
+	local total = screen_h / 3 * n_max
+	local y = gui.get_position(gui.get_node("log_scroll")).y
+	return -y / total
+end
+
+local function update_log_scroll(percentage)
+	local n = matchanovel.get_log_size()
+	local max = math.max(1, n - 3)
+	percentage = percentage or get_log_percentage()
+	local first = math.ceil(percentage * max)
+	if not current_drawn_log or current_drawn_log ~= first then
+		for i = 1, 4 do
+			local line = first + i - 1
+			local s = get_log_text(line)
+			gui.set_text(log_nodes[i], s)
+			gui.set_position(log_nodes[i], get_log_text_position(line))
+		end
+		current_drawn_log = first
 	end
 end
 
-local function set_slider_value(slider, value, animate)
+local function scroll_log_target_reached()
+	scroll_log_target = false
+end
+
+local function scroll_log_to(percentage, duration)
+	if percentage < 0 then
+		percentage = 0
+	elseif percentage > 1 then
+		percentage = 1
+	end
+	local screen_h = 1080
+	local n = matchanovel.get_log_size()
+	local max = n - 3
+	if n < 4 then
+		percentage = 0
+		max = 1
+	end
+	local node = gui.get_node("log_scroll")
+	local position = gui.get_position(node)
+	local total = screen_h / 3 * max
+	position.y = - total * percentage
+	if duration and duration > 0 then
+		scroll_log_target = percentage
+		gui.animate(node, "position.y", position.y, gui.EASING_LINEAR, duration, 0, scroll_log_target_reached)
+	else
+		scroll_log_target = false
+		gui.set_position(node, position)
+	end
+	update_log_scroll(percentage)
+end
+
+local function scroll_log_by(screen_dy, duration)
+	local top = gui.get_node("log_slider_top")
+	local bottom = gui.get_node("log_slider_bottom")
+	local height = gui.get_size(gui.get_node("log_slider_back")).y
+	local size = gui.get_size(gui.get_node("log_slider_button")).y
+	local max = height / 2 - size / 2
+	local min = - max
+	gui.set_position(top, vmath.vector3(0, max, 0))
+	gui.set_position(bottom, vmath.vector3(0, min, 0))
+	local slider_screen_height = gui.get_screen_position(top).y - gui.get_screen_position(bottom).y
+	local slider_total_height = height - size
+	local screen_scale = slider_screen_height / slider_total_height
+
+	local screen_h = 1080
+	local n = matchanovel.get_log_size()
+	if n < 4 then return end
+	local n_max = n - 3
+	local total = screen_h / 3 * n_max
+	local y = gui.get_position(gui.get_node("log_scroll")).y
+	local current_percentage = get_log_percentage()
+	local added_percentage = -screen_dy / screen_scale / total
+	local percentage = (scroll_log_target or current_percentage) + added_percentage
+	if percentage < 0 then
+		percentage = 0
+	elseif percentage > 1 then
+		percentage = 1
+	end
+	scroll_log_to(percentage, duration)
+
+	local slider_button = gui.get_node("log_slider_button")
+	local slider_position = gui.get_position(slider_button)
+	slider_position.y = min + (max - min) * percentage
+	gui.set_position(slider_button, slider_position)
+end
+
+local function move_log_slider(screen_dy)
+	local n = matchanovel.get_log_size()
+	if n < 4 then return end
+	
+	local node = gui.get_node("log_slider_button")
+	local height = gui.get_size(gui.get_node("log_slider_back")).y
+	local size = gui.get_size(node).y
+	local max = height / 2 - size / 2
+	local min = - max
+	local total = max - min
+
+	local top = gui.get_node("log_slider_top")
+	local bottom = gui.get_node("log_slider_bottom")
+	gui.set_position(top, vmath.vector3(0, max, 0))
+	gui.set_position(bottom, vmath.vector3(0, min, 0))
+	local slider_screen_height = gui.get_screen_position(top).y - gui.get_screen_position(bottom).y
+	local add_percentage = screen_dy / slider_screen_height
+	
+	local position = gui.get_position(node)
+	position.y = position.y + total * add_percentage
+	if position.y < min then
+		position.y = min
+	elseif position.y > max then
+		position.y = max
+	end
+	gui.set_position(node, position)
+
+	local total_percentage = (position.y - min) / total
+	scroll_log_to(total_percentage)
+end
+
+local function init_log()
+	local node_text_1 = gui.get_node("log_text")
+	local node_box_1 = gui.get_node("log_box")
+	local screen_w = 1920
+	local screen_h = 1080
+	
+	local width = screen_w*0.6
+	local height = screen_h*0.25
+	local x = -width/2 + screen_w*0.1
+	local log_free_space = 0.25
+	local distance = screen_h * log_free_space / log_lines 
+	
+	gui.set_text(node_text_1, "")
+	gui.set_size(node_text_1, vmath.vector3(width, height, 0))
+	gui.set_size(node_box_1, vmath.vector3(width, height, 0))
+
+	local node_text = node_text_1
+	local node_box = node_box_1
+	local position = get_log_text_position(1)
+	gui.set_position(node_text, position)
+	gui.set_parent(node_box, node_text, false)
+	log_nodes[1] = node_text
+
+	for i = 2, 4 do
+		node_text = gui.clone(node_text_1)
+		node_box = gui.clone(node_box_1)
+		position = get_log_text_position(i)
+		gui.set_position(node_text, position)
+		gui.set_parent(node_box, node_text, false)
+		log_nodes[i] = node_text
+	end
+
+	gui.set_position(gui.get_node("log_slider"), vmath.vector3(screen_w / 2 - 96, 0, 0))
+	gui.set_size(gui.get_node("log_slider_back"), vmath.vector3(64, screen_h - distance, 0))
+	set_log_slider_size(1)
+end
+
+local function update_log()
+	local n = matchanovel.get_log_size()
+	local slider_size = log_lines / n
+	if slider_size > 1 then
+		slider_size = 1
+	end
+	set_log_slider_size(slider_size)
+
+	if log_lines >= n then
+		set_log_slider_position(0)
+	else
+		local pos_min = 1
+		local pos_max = n - 2
+		local pos = (log_line - pos_min) / (pos_max - pos_min)
+		if pos < 0 then
+			pos = 0
+		elseif pos > 1 then
+			pos = 1
+		end 
+		set_log_slider_position(pos)
+	end
+		
+end
+
+local function log_back()
+	--TODO: smooth scroll to grid, target_scroll
+	local _, h = window.get_size()
+	scroll_log_by(-h/3, 0.1)
+end
+
+local function log_forward()
+	if gui.get_position(gui.get_node("log_scroll")).y < 0 then
+		local _, h = window.get_size()
+		scroll_log_by(h/3, 0.1)
+	else
+		hide_menu()
+	end
+end
+
+local function log_newest()
+	scroll_log_to(0, 0)
+	set_log_slider_position(0)
+end
+
+local function log_oldest()
+	scroll_log_to(1, 0)
+	set_log_slider_position(1)
+end
+
+local function show_log()
+	active_menu = "log"
+	paused_menu = "log"
+	log_line = 1
+	--enable_current_page()
+	--show_menu()
+	--show_tabs(0.4)
+	update_log()
+	scroll_log_to(0)
+end
+
+
+
+local function show_page_done()
+	transition = false
+end
+
+local opened_tab = false
+
+local function show_page()
+	enable_current_page()
+	if active_menu then
+		opened_tab = active_menu
+		local node = gui.get_node("pages")
+		gui.set_enabled(node, true)
+		gui.set_rotation(node, vmath.vector3(0, 0, 0))
+		gui.set_alpha(node, 1)
+		--local duration = 0.2
+		--local angle = page_rotation_angle * rotate_pages_direction
+		--gui.set_rotation(node, vmath.vector3(0, 0, -angle))
+		--gui.animate(node, "rotation.z", 0, gui.EASING_INOUTSINE, duration, 0, show_page_done)
+		--gui.animate(node, "color.w", 1, gui.EASING_INOUTSINE, duration)
+		if active_menu == "save" then
+			gui.set_text(gui.get_node("save_title"), "Save")
+		elseif active_menu == "load" then
+			gui.set_text(gui.get_node("save_title"), "Load")
+		elseif active_menu == "log" then
+			show_log()
+		end
+		if active_menu == "settings" then
+			matchanovel.post("textbox", "show_above_menu")
+		else
+			matchanovel.post("textbox", "show_below_menu")
+		end
+		--transition = true
+		transition = false
+	end
+end
+
+local function hide_page()
+	unhover_save()
+	local node = gui.get_node("pages")
+	gui.set_enabled(node, false)
+	--[[
+	local node = gui.get_node("pages")
+	local duration = 0.2
+	local angle = page_rotation_angle * rotate_pages_direction
+	gui.animate(node, "rotation.z", angle, gui.EASING_INOUTSINE, duration, 0, show_page)
+	gui.animate(node, "color.w", 0, gui.EASING_INOUTSINE, duration)
+	transition = true
+	--]]
+	show_page()
+end
+
+local function get_current_page_number()
+	if active_menu == title then return 0 end
+	for k, v in pairs(tabs) do
+		if active_menu == v then
+			return k
+		end
+	end
+	return 0
+end
+
+local function start(label)
+	hide_menu(1.0)
+	hide_page()
+	matchanovel.start(label)
+	paused_menu = false
+	active = false
+	starting = false
+	title = false
+end
+
+local function go_from_tab_to_page()
+	using_buttons_for_tabs = false
+	--gui.animate(gui.get_node("cursor"), "color.w", .3, gui.EASING_LINEAR, .2)
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+
+end
+
+local function go_from_page_to_tabs()
+	using_buttons_for_tabs = true
+	--gui.animate(gui.get_node("cursor"), "color.w", 1, gui.EASING_LINEAR, .2)
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_deactivated"})
+end
+
+local function press_selected_tab()
+end
+
+local function apply_tab(id, press)
+	if id == "start" then
+		if press then
+			start()
+		else
+			active_menu = "start"
+			hide_page()
+		end
+	elseif id == "continue" then
+		if press then
+			hide_menu()
+		else
+			active_menu = "continue"
+			hide_page()
+		end
+	elseif id == "load" then
+		active_menu = "load"
+		hide_page()
+	elseif id == "settings" then
+		active_menu = "settings"
+		hide_page()
+	elseif id == "quit" then
+		if title then
+			active_menu = "quit_title"
+		else
+			active_menu = "quit"
+		end
+		hide_page()
+	elseif id == "quit_title" then
+		active_menu = "quit_title"
+		hide_page()
+	elseif id == "save" then
+		active_menu = "save"
+		hide_page()
+	elseif id == "log" then
+		active_menu = "log"
+		hide_page()
+	elseif id == "extras" then
+		active_menu = "extras"
+		hide_page()
+	elseif id == "characters" then
+		active_menu = "characters"
+		hide_page()
+	end
+end
+
+local function select_tab(tab)
+	selected_tab = tab
+	local id = tabs[tab]
+	if not id then return end
+	if active_menu and id == active_menu then return end
+
+	if tab < get_current_page_number() then
+		rotate_pages_direction = -1
+	else
+		rotate_pages_direction = 1
+	end
+	animate_tab_select(tab)
+	go_from_page_to_tabs()
+	gui.animate(gui.get_node("tab_highlight"), "color.w", 0, gui.EASING_LINEAR, 0.2)
+	highlight = false
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_click"})
+end
+
+local function press_tab(tab, press)
+	selected_tab = tab
+	local id = tabs[tab]
+	if not id then return end
+	--if active_menu and id == active_menu then return end -- TODO
+
+	select_tab(tab)
+	apply_tab(id, press)
+end
+
+local function tab_down(press)
+	if selected_tab and selected_tab < #tabs then
+		press_tab(selected_tab + 1, press)
+	end
+end
+
+local function tab_up(press)
+	if selected_tab and selected_tab > 1 then
+		press_tab(selected_tab - 1, press)
+	end
+end
+
+local function tab_highlight_pulse(self, node)
+	gui.animate(node, "color.w", 0.75, gui.EASING_INOUTSINE, 2, 0, nil, gui.PLAYBACK_LOOP_PINGPONG)
+end
+
+local function highlight_tab(tab)
+	if highlight ~= tab then
+		local node = gui.get_node("tab_highlight")
+		local node_sprite = gui.get_node("highlight")
+		local node_text = gui.get_node("tab_text_"..tab)
+		local alpha = gui.get_alpha(node)
+		--[[
+		local font_resource = gui.get_font_resource(gui.get_font(node_text))
+		local metrics = resource.get_text_metrics(font_resource, gui.get_text(node_text))
+		local width = metrics.width + 150
+		if width < 300 then
+			width = 300
+		end
+		if alpha == 0 then
+			gui.animate(node, "position.y", get_tab_y(tab), gui.EASING_LINEAR, 0)
+			gui.animate(node_sprite, "size.x", width, gui.EASING_LINEAR, 0)
+		else
+			gui.animate(node, "position.y", get_tab_y(tab), gui.EASING_LINEAR, 0.15)
+			gui.animate(node_sprite, "size.x", width, gui.EASING_LINEAR, 0.15)
+		end
+		--]]
+		gui.animate(node, "position.y", get_tab_y(tab), gui.EASING_LINEAR, 0.15)
+		gui.animate(node, "color.w", 1, gui.EASING_LINEAR, 0.2, 0, tab_highlight_pulse)
+		highlight = tab
+	end
+end
+
+local function change_sprite(node_id, image_id)
+	if not changed_sprites[node_id] or changed_sprites[node_id] ~= image_id then
+		local node = gui.get_node(node_id)
+		local clone = gui.clone(node)
+		local duration = 0.5
+		gui.play_flipbook(node, image_id)
+		gui.animate(clone, "color.w", 0, gui.EASING_LINEAR, duration, 0, function(self, node) gui.delete_node(node) end)
+		changed_sprites[node_id] = image_id
+	end
+end
+
+local function show_title()
+	set_tabs("title")
+	active_menu = "title"
+	show_menu()
+	--hide_tabs()
+	show_tabs(0)
+	save.reset()
+	
+	matchanovel.back_to_title()
+	title = true
+	pause = false
+	--starting = true
+end
+
+
+
+
+
+local function apply_slider(name, value, preview)
+	settings.set(name, math.floor(value*100 + 0.5))
+	if name == "text_speed" then
+		matchanovel.post("textbox", "set_textspeed", {value = value, preview = preview})
+	elseif name == "auto_speed" then
+		matchanovel.post("textbox", "set_autospeed", {value = value, preview = preview})
+	elseif name == "volume_music" then
+		matchanovel.post("sound", "set_volume_bgm", {volume = value, preview = preview})
+	elseif name == "volume_sound" then
+		matchanovel.post("sound", "set_volume_sfx", {volume = value, preview = preview})
+	end
+end
+
+local function set_slider_value(slider, value, animate, preview)
 	slider_value[slider] = value
 	local node = gui.get_node("slider_empty_"..slider)
 	local node_full = gui.get_node("slider_full_"..slider)
@@ -134,11 +931,11 @@ local function set_slider_value(slider, value, animate)
 	else
 		gui.set_size(node_full, size)
 	end
-	apply_slider(sliders[slider], value)
+	apply_slider(sliders[slider], value, preview)
 end
 
 
-local function set_slider(slider, screen_x)
+local function set_slider(slider, screen_x, preview)
 	local node = gui.get_node("slider_empty_"..slider)
 	local node_min = gui.get_node("arrow_left_"..slider)
 	local node_max = gui.get_node("arrow_right_"..slider)
@@ -152,14 +949,12 @@ local function set_slider(slider, screen_x)
 	if value < 0 then value = 0 end
 	if value > 1 then value = 1 end 
 	
-	set_slider_value(slider, value)
+	set_slider_value(slider, value, false, preview)
 
 	--msg.post("sound#sound", "set_volume", {volume = value})
 end
 
 local text_nodes = {
-	"title_text",
-	"box_okay_text",
 	"slider_name_1",
 	"slider_name_2",
 	"slider_name_3",
@@ -168,22 +963,127 @@ local text_nodes = {
 	"button_2_2",
 	"button_3_1",
 	"button_3_2",
+	"save_title",
+	"save_page_number",
+	"tab_text_1",
+	"tab_text_2",
+	"tab_text_3",
+	"tab_text_4",
+	"tab_text_5",
+	"tab_text_6",
+	"tab_text_7",
+	"tab_text_8",
+	"button_quit",
+	"button_title",
+	"button_quit_title_question",
+	"button_quit_title_yes",
+	"button_quit_title_no",
 }
 
-local function set_font(font)
+local menu_text_nodes = {
+	"button_quit",
+	"button_title",
+	"button_quit_title_question",
+	"button_quit_title_yes",
+	"button_quit_title_no",
+}
+
+local themed_colors_menu_front = {
+	"page_left",
+	"page_right",
+}
+
+local themed_images = {
+	menu_back_image = {
+		default = "menu_background",
+		dark = "menu_background",
+		light = "menu_background_light",
+		dyslexia = "menu_background_light",
+	},
+}
+
+local function set_menu_font(font, color)
 	for _, id in pairs(text_nodes) do
-		gui.set_font(gui.get_node(id), font)
+		local node = gui.get_node(id)
+		if font then
+			gui.set_font(node, font)
+		end
+		if color then
+			gui.animate(node, "color", color, gui.EASING_LINEAR, 0.5)
+		end
 	end
-	if font == "dyslexia" then 
-		gui.set_leading(gui.get_node("slider_name_1"), 0.5)
-		gui.set_leading(gui.get_node("slider_name_2"), 0.5)
-	else
-		gui.set_leading(gui.get_node("slider_name_1"), 0.65)
-		gui.set_leading(gui.get_node("slider_name_2"), 0.65)
+	for _, node in pairs(log_nodes) do
+		if font then
+			gui.set_font(node, font)
+		end
+		if color then
+			gui.animate(node, "color", color, gui.EASING_LINEAR, 0.5)
+		end
 	end
-	msg.post("textbox#textbox", "set_font", {font = font})
-	msg.post("quickmenu#quickmenu", "set_font", {font = font})
-	msg.post("choices#choices", "set_font", {font = font})
+end
+
+local function set_font(font, color)
+	set_menu_font(font, color)
+	if font then
+		msg.post("textbox#textbox", "set_font", {font = font})
+		msg.post("quickmenu#quickmenu", "set_font", {font = font})
+		msg.post("choices#choices", "set_font", {font = font})
+	end
+end
+
+local function update_theme()
+	local color_menu_front = theme.get("color_menu_front")
+	local font_menu = theme.get("font_menu")
+	local font_text = theme.get("font_text")
+	local theme_type = theme.get("type")
+	local font_tabs_scale = theme.get("font_tabs_scale")
+	
+	for k, v in pairs(themed_images) do
+		local animation = v[theme_type]
+		if animation then
+			change_sprite(k, animation)
+		end
+	end
+	
+	if color_menu_front then
+		for k, v in pairs(themed_colors_menu_front) do
+			gui.set_color(gui.get_node(v), color_menu_front)
+		end
+	end
+
+	for k, v in pairs(menu_text_nodes) do
+		local node = gui.get_node(v)
+		if font_menu then
+			gui.set_font(node, font_menu)
+		end
+		if color_menu_front then
+			gui.set_color(node, color_menu_front)
+		end
+	end
+	
+	for i = 1, 8 do
+		gui.set_font(gui.get_node("tab_text_"..i), font_menu)
+		gui.set_color(gui.get_node("tab_text_"..i), color_menu_front)
+		gui.set_scale(gui.get_node("tab_text_"..i), vmath.vector3(font_tabs_scale, font_tabs_scale, 1))
+	end
+	
+	for k, v in pairs(log_nodes) do
+		if color_menu_front then
+			gui.set_color(v, color_menu_front)
+		end
+		if font_text then
+			gui.set_font(v, font_text)
+		end
+	end
+	
+	set_menu_font(font_text, color_menu_front)
+end
+
+local function set_theme(value)
+	theme.set(value)
+	update_theme()
+	matchanovel.post("textbox", "update_theme")
+	--matchanovel.post("textbox", "set_theme", {theme = value})
 end
 
 local function enable_fullscreen()
@@ -209,6 +1109,8 @@ local function apply_option(name, value)
 		pressed_option = false
 	elseif name == "font" then 
 		set_font(value)
+	elseif name == "theme" then 
+		set_theme(value)
 	elseif name == "skip_all" then
 		msg.post("textbox#textbox", "set_skip_all", {value = value})
 	end
@@ -236,7 +1138,7 @@ local function pick_option(group, option)
 end
 
 local function toggle_fullscreen()
-	if defos.is_fullscreen() then
+	if defos and defos.is_fullscreen() then
 		pick_option(3, 2)
 	else 
 		pick_option(3, 1)
@@ -266,36 +1168,43 @@ local function show_slot_as_written(page_slot, text)
 	local slot = get_slot_number(page_slot)
 	text = text or save.get_text(slot, false, false)
 	if text then
-		gui.set_text(gui.get_node("save_text_"..page_slot), text) --"2022-08-09\n00:38:12"
+		gui.set_text(gui.get_node("save_"..page_slot.."/text"), text) --"2022-08-09\n00:38:12"
 	end
-	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
+	--gui.play_flipbook(gui.get_node("save_"..page_slot.."/thumbnail"), "thumbnail")
+	gui.set_enabled(gui.get_node("save_"..page_slot.."/thumbnail"), true)
+	images.set_node_to_thumbnail("save_"..page_slot.."/thumbnail", slot)
+	--gui.animate(gui.get_node("save_"..page_slot.."/slot"), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
 end
 
 local function show_slot_as_empty(page_slot)
 	save_written[page_slot] = false
-	gui.set_text(gui.get_node("save_text_"..page_slot), "empty")
-	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.4, gui.EASING_INOUTSINE, 0.25)
+	gui.set_text(gui.get_node("save_"..page_slot.."/text"), "empty")
+	gui.set_enabled(gui.get_node("save_"..page_slot.."/thumbnail"), false)
+	--gui.play_flipbook(gui.get_node("save_"..page_slot.."/thumbnail"), "thumbnail_empty")
+	--gui.animate(gui.get_node("save_"..page_slot.."/slot"), "color.w", 0.4, gui.EASING_INOUTSINE, 0.25)
 end
 
 local function write_save(page_slot)
-	show_slot_as_written(page_slot, save.get_current_text())
 	local slot = get_slot_number(page_slot)
+	images.save_cached_screenshot(slot)
+	show_slot_as_written(page_slot, save.get_current_text())
 	matchanovel.write_save(slot, false, false)
 end
 
 local function load_save(page_slot)
 	if not save_written[page_slot] then return end
 	
-	gui.animate(gui.get_node("save_"..page_slot), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
+	gui.animate(gui.get_node("save_"..page_slot.."/slot"), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
 	local slot = get_slot_number(page_slot)
 	matchanovel.load_save(slot, false, false)
+	hide_menu()
 end
 
 local function update_save_page()
 	gui.set_text(gui.get_node("save_page_number"), save_page)
 	for i = 1, save_slots_per_page do
 		local slot = get_slot_number(i)
-		gui.set_text(gui.get_node("save_number_"..i), slot)
+		gui.set_text(gui.get_node("save_"..i.."/number"), slot)
 		if save.is_used(slot) then 
 			show_slot_as_written(i)
 		else
@@ -304,20 +1213,107 @@ local function update_save_page()
 	end
 end
 
-local function save_page_forward()
+local function save_page_animating_done()
+	save_page_animating = false
+end
+
+local function save_page_forward_2()
+	local node = gui.get_node("save_scroll")
+	local duration = save_page_duration
+	local delay = 1/30
+	local x = save_page_animation_x
+	gui.set_position(node, vmath.vector3(x, 0, 0))
+	gui.animate(node, "position.x", 0, gui.EASING_INOUTSINE, duration, delay, save_page_animating_done)
+	gui.animate(node, "color.w", 1, gui.EASING_INOUTSINE, duration*2, delay)
+	update_save_page()
+end
+
+local function save_page_forward(duration)
+	save_page_animating = true
 	save_page = save_page + 1
 	if save_page > save_page_max then 
 		save_page = 1
 	end
+	local node = gui.get_node("save_scroll")
+	duration = duration or save_page_duration
+	local x = save_page_animation_x
+	gui.animate(node, "position.x", -x, gui.EASING_INOUTSINE, duration)
+	gui.animate(node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, save_page_forward_2)
+	save_scroll = false
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_click"})
+end
+
+local function save_page_back_2()
+	local node = gui.get_node("save_scroll")
+	local duration = save_page_duration
+	local delay = 1/30
+	local x = save_page_animation_x
+	gui.set_position(node, vmath.vector3(-x, 0, 0))
+	gui.animate(node, "position.x", 0, gui.EASING_INOUTSINE, duration, delay, save_page_animating_done)
+	gui.animate(node, "color.w", 1, gui.EASING_INOUTSINE, duration*2, delay)
 	update_save_page()
 end
 
-local function save_page_back()
+local function save_page_back(duration)
+	save_page_animating = true
 	save_page = save_page - 1
 	if save_page <= 0 then 
 		save_page = save_page_max
 	end
-	update_save_page()
+	local node = gui.get_node("save_scroll")
+	duration = duration or save_page_duration
+	local x = save_page_animation_x
+	gui.animate(node, "position.x", x, gui.EASING_INOUTSINE, duration)
+	gui.animate(node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, save_page_back_2)
+	save_scroll = false
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_click"})
+end
+
+local function save_page_first(duration)
+	if save_page == 1 then return end
+	save_page_animating = true
+	save_page = 1
+	local node = gui.get_node("save_scroll")
+	duration = duration or 0.2
+	local x = save_page_animation_x
+	gui.animate(node, "position.x", x, gui.EASING_INOUTSINE, duration)
+	gui.animate(node, "color.w", 0, gui.EASING_INOUTSINE, duration, 0, save_page_back_2)
+	save_scroll = false
+	matchanovel.post("sound", "play_sfx", {id = "menu_tab_click"})
+end
+
+local function scroll_save_page(screen_dx)
+	if save_page_animating then return end
+	local screen_scale_1 = gui.get_screen_position(gui.get_node("save_scroll")).x
+	local screen_scale_2 = gui.get_screen_position(gui.get_node("save_scroll_scale")).x
+	local screen_scale = (screen_scale_2 - screen_scale_1) / 100
+	local dx = screen_dx / screen_scale
+	if save_scroll then
+		save_scroll = save_scroll + dx
+	else
+		save_scroll = dx
+	end
+	local alpha = 1
+	local change_page
+	if save_scroll > save_scroll_width * 2 then
+		alpha = 0
+		change_page = -1
+	elseif save_scroll > save_scroll_width then
+		alpha = 1 - (save_scroll - save_scroll_width) / save_scroll_width
+	elseif save_scroll < -save_scroll_width * 2 then
+		alpha = 0
+		change_page = 1
+	elseif save_scroll < -save_scroll_width then
+		alpha = 1 - (-save_scroll - save_scroll_width) / save_scroll_width
+	end
+	local node = gui.get_node("save_scroll")
+	gui.set_position(node, vmath.vector3(save_scroll, 0, 0))
+	gui.set_alpha(node, alpha)
+	if change_page == 1 then
+		save_page_forward(0)
+	elseif change_page == -1 then
+		save_page_back(0)
+	end
 end
 
 local function load_settings()
@@ -343,237 +1339,781 @@ local function load_settings()
 	end
 end
 
+local function back_to_title()
+	matchanovel.unload()
+	active_menu = "title"
+	hide_page()
+	show_title()
+end
+
+local function quit()
+	sys.exit(0)
+end
+
+local function use_buttons()
+	using_buttons_for_tabs = true
+	select_tab(selected_tab or 1)
+end
+
+local function back_to_tab_select()
+	using_buttons_for_page = false
+	using_buttons_for_tabs = true
+	active_menu = false
+	hide_page()
+end
+
+local function change_save(dx, dy, mute)
+	if not save_hovered then
+		hover_save(1, mute)
+	else
+		if dx then
+			if dx == 1 then
+				if (save_hovered % save_slots_x) == 0 then
+					save_page_forward()
+					hover_save(save_hovered + 1 - save_slots_x, mute)
+				else
+					hover_save(save_hovered + 1, mute)
+				end
+			elseif dx == -1 then
+				if (save_hovered % save_slots_x) == 1 then
+					save_page_back()
+					hover_save(save_hovered - 1 + save_slots_x, mute)
+				else
+					hover_save(save_hovered - 1, mute)
+				end
+			end
+		end
+		if dy then
+			if dy == 1 then
+				hover_save((save_hovered - 1 + save_slots_x) % save_slots_per_page + 1, mute)
+			elseif dy == -1 then
+				hover_save((save_hovered - 1 + save_slots_per_page - save_slots_x) % save_slots_per_page + 1, mute)
+			end
+		end
+	end
+end
+
+local function use_save_slot(slot)
+	if not slot then return end
+	if active_menu == "save" then
+		write_save(slot)
+	else
+		load_save(slot)
+	end
+	matchanovel.post("sound", "play_sfx", {id = "menu_save_release"})
+end
+
+local function input_continue(action_id, action)
+	if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+		hide_menu()
+	end
+end
+
+local function init_title()
+	local node = gui.get_node("title_text")
+	local script_title = save.get_var("project.title")
+	local project_title = sys.get_config_string("project.title")
+	if script_title then
+		gui.set_text(node, script_title)
+	elseif project_title then
+		gui.set_text(node, project_title)
+	end
+end
 
 
 
 
 function init(self)
 	msg.post("window_listener#window_listener", "add_listener")
-	gui.set_enabled(gui.get_node("menu"), false)
+	gui.set_enabled(gui.get_node("menu"), true)
 	gui.set_enabled(gui.get_node("settings"), false)
-	gui.set_scale(gui.get_node("menu"), vmath.vector3(0.5, 1, 1))
-	gui.set_alpha(gui.get_node("menu"), 0)
-
+	--gui.set_scale(gui.get_node("menu"), vmath.vector3(0.5, 1, 1))
+	gui.set_alpha(gui.get_node("menu"), 1)
+	--set_tabs(tabs_title)
 	--update_save_page()
 	--load_settings()
+	
+
+	set_tabs("title")
+	show_title()
+	init_log()
+	gui.animate(gui.get_node("fade"), "color.w", 0, gui.EASING_INOUTSINE, 2)
+
+	matchanovel.init()
+	init_title()
+	--set_dyslexia_mode()
 end
 
-function update(self, dt)
+function update(self, dt)	
+	if active_frames then
+		active_frames = active_frames - 1
+		if active_frames <= 0 then
+			active_frames = false
+			active = false
+		end
+	end
+	if scroll_log_target then
+		update_log_scroll()
+	end
 end
 
 function on_message(self, message_id, message, sender)
 	if message_id == hash("show_settings") then
+		paused_menu = "settings"
+		show_pause_menu()
 		show_settings()
+		show_page()
 	elseif message_id == hash("hide_menu") then 
 		hide_menu()
+	elseif message_id == hash("show_pause_menu") then 
+		show_pause_menu()
+		show_page()
 	elseif message_id == hash("show_save") then 
+		paused_menu = "save"
+		show_pause_menu()
 		show_save()
+		show_page()
 	elseif message_id == hash("show_load") then 
+		paused_menu = "load"
+		show_pause_menu()
 		show_load()
+		show_page()
+	elseif message_id == hash("show_log") then 
+		show_log()
+		show_pause_menu()
+		show_page()
+		go_from_tab_to_page()
+	elseif message_id == hash("title") then 
+		paused_menu = "title"
+		show_pause_menu()
+		show_title()
+		show_page()
 	elseif message_id == hash("init") then
 		update_save_page()
 		load_settings()
+		if matchanovel.autostart() then
+			start("autostart")
+		end
+	elseif message_id == hash("set_font") then
+		set_font(message.font, message.color) 
+	elseif message_id == hash("set_fullscreen") then 
+		if message.fullscreen then
+			enable_fullscreen()
+		else
+			disable_fullscreen()
+		end
 	elseif message_id == hash("set_render_order") then 
 		gui.set_render_order(message.n)
 	elseif message_id == hash("event_window_resized") then 
-		gui.set_scale(gui.get_node("zoom"), vmath.vector3(message.zoom_fit, message.zoom_fit, 1))
-		gui.set_scale(gui.get_node("menu_back"), vmath.vector3(1, message.zoom_fit, 1))
+		--gui.set_scale(gui.get_node("zoom"), vmath.vector3(message.zoom_fit, message.zoom_fit, 1))
+		--gui.set_scale(gui.get_node("menu_back"), vmath.vector3(1, message.zoom_fit, 1))
+	end
+end
+
+local function input_settings(action_id, action)
+	if (action_id == hash("touch") or action_id == hash("middle")) then
+		if action.pressed then
+			if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+				for i = 1, #sliders do
+					if gui.pick_node(gui.get_node("slider_empty_"..i), action.x, action.y) then
+						pressed_slider = i
+						break
+					end
+					--[[
+					if gui.pick_node(gui.get_node("arrow_left_"..i), action.x, action.y) then
+						pressed_slider_arrow = i
+						slider_minus(i)
+						break
+					end
+					if gui.pick_node(gui.get_node("arrow_right_"..i), action.x, action.y) then
+						pressed_slider_arrow = i
+						slider_plus(i)
+						break
+					end
+					--]]
+				end
+				----[[
+				for k, v in pairs(option_names) do
+					for i = 1, #options[v] do
+						if gui.pick_node(gui.get_node("button_"..k.."_"..i), action.x, action.y) then
+							pick_option(k, i)
+							pressed_option = k
+							break
+						end
+					end
+				end
+				--]]
+
+			else
+				pressed = "outside_menu"
+			end
+		elseif action.repeated then
+			--[[
+			if pressed_slider_arrow then 
+				if gui.pick_node(gui.get_node("arrow_left_"..pressed_slider_arrow), action.x, action.y) then
+					slider_minus(pressed_slider_arrow)
+				elseif gui.pick_node(gui.get_node("arrow_right_"..pressed_slider_arrow), action.x, action.y) then
+					slider_plus(pressed_slider_arrow)
+				end
+			end
+			--]]
+		elseif action.released then
+			if pressed and pressed == "outside_menu" then 
+				if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+					--hide_menu()
+					msg.post("#", "hide_menu")
+				end
+			end
+
+			if pressed_slider then
+				set_slider(pressed_slider, action.screen_x, true)
+			end
+			pressed = false
+			pressed_slider = false
+			pressed_option = false
+			pressed_slider_arrow = false
+		else
+			if pressed_slider then
+				set_slider(pressed_slider, action.screen_x)
+			elseif pressed_option then
+				local name = option_names[pressed_option]
+				for i = 1, #options[name] do
+					if gui.pick_node(gui.get_node("button_"..pressed_option.."_"..i), action.x, action.y) then
+						pick_option(pressed_option, i)
+						break
+					end
+				end
+			end
+		end
+	end
+end
+
+local function input_save(action_id, action)
+	if not action_id then
+		if save_hovered then
+			local node = gui.get_node("save_"..save_hovered.."/slot")
+			if not gui.pick_node(node, action.x, action.y) then
+				unhover_save()
+			end 
+		end
+		if save_scroll then
+			scroll_save_page(action.screen_dx)
+		end
+		if not save_hovered and not pressed_save and not save_scroll then
+			for i = 1, save_slots_per_page do
+				local node = gui.get_node("save_"..i.."/slot")
+				if gui.pick_node(node, action.x, action.y) then
+					hover_save(i)
+				end
+			end
+		end
+	elseif (action_id == hash("touch") or action_id == hash("middle")) then
+		if action.pressed then
+			if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+				for i = 1, 6 do
+					local node = gui.get_node("save_"..i.."/area")
+					if gui.pick_node(node, action.x, action.y) then
+						press_save(i)
+					end
+				end
+				if gui.pick_node(gui.get_node("page_right"), action.x, action.y) then 
+					pressed = "page_right"
+				elseif gui.pick_node(gui.get_node("page_left"), action.x, action.y) then 
+					pressed = "page_left"
+				end
+				save_scroll = 0
+			else
+				pressed = "outside_menu"
+			end
+		elseif action.released then
+			if pressed_save then 
+				local node = gui.get_node("save_"..pressed_save.."/area")
+				if gui.pick_node(node, action.x, action.y) then
+					use_save_slot(pressed_save)
+				end
+				unpress_save()
+			elseif pressed then
+				if pressed == "outside_menu" then 
+					if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
+						msg.post("#", "hide_menu")
+					end
+				elseif pressed == "page_right" then
+					if gui.pick_node(gui.get_node("page_right"), action.x, action.y) then
+						save_page_forward()
+					end
+				elseif pressed == "page_left" then
+					if gui.pick_node(gui.get_node("page_left"), action.x, action.y) then
+						save_page_back()
+					end
+				end
+			end
+			scroll_save_page_return()
+			pressed = false
+			pressed_slider = false
+			pressed_option = false
+			pressed_slider_arrow = false
+			pressed_save = false
+			save_scroll = false
+		else
+			if pressed_save then
+				local node = gui.get_node("save_"..pressed_save.."/slot")
+				if not gui.pick_node(node, action.x, action.y) then
+					matchanovel.post("sound", "play_sfx", {id = "menu_save_press_reverse"})
+					local node_zoom = gui.get_node("save_"..pressed_save.."/zoom")
+					gui.animate(node_zoom, "scale", vmath.vector3(1, 1, 1), gui.EASING_OUTBOUNCE, 0.25)
+					pressed_save = false
+				end
+			end
+		end
+	end
+	if using_buttons_for_tabs then
+		if action_id == hash("right") and action.pressed then
+			change_save(1, 0, true)
+			go_from_tab_to_page()
+		elseif (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			change_save(1, 0, true)
+			go_from_tab_to_page()
+		end
+	else
+		if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			use_save_slot(save_hovered)
+			unpress_save()
+		elseif action_id == hash("b") then
+			unhover_save()
+			go_from_page_to_tabs()
+		elseif action_id == hash("right") and action.repeated then
+			change_save(1, 0)
+		elseif action_id == hash("left") and action.repeated then
+			change_save(-1, 0)
+		elseif action_id == hash("up") and action.repeated then
+			change_save(0, -1)
+		elseif action_id == hash("down") and action.repeated then
+			change_save(0, 1)
+		elseif action_id == hash("back") then
+			if action.repeated then
+				save_page_back()
+			end
+		elseif action_id == hash("forward") then
+			if action.repeated then
+				save_page_forward()
+			end
+		elseif action_id == hash("home") then
+			if action.pressed then
+				save_page_first()
+			end
+		end
+	end
+end
+
+local function unhover_quit()
+	quit_hovered = false
+	local node = gui.get_node("button_title")
+	gui.animate(node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_quit")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+end
+
+local function hover_quit_1(mute)
+	if quit_hovered == 1 then return end
+	quit_hovered = 1
+	local node = gui.get_node("button_title")
+	gui.animate(node, "color", vmath.vector3(1, 0, 0), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_quit")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	if not mute then
+		matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+	end
+end
+
+local function hover_quit_2(mute)
+	if quit_hovered == 2 then return end
+	quit_hovered = 2
+	local node = gui.get_node("button_quit")
+	gui.animate(node, "color", vmath.vector3(1, 0, 0), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_title")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	if not mute then
+		matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+	end
+end
+
+local function input_quit(action_id, action)
+	if (action_id == hash("touch") or action_id == hash("middle")) then
+		if action.released then
+			if gui.pick_node(gui.get_node("button_title"), action.x, action.y) then
+				back_to_title()
+			elseif gui.pick_node(gui.get_node("button_quit"), action.x, action.y) then
+				quit()
+			end
+		end
+	end
+	if using_buttons_for_tabs then
+		if action_id == hash("right") and action.pressed then
+			go_from_tab_to_page()
+			hover_quit_1(true)
+		elseif (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			go_from_tab_to_page()
+			hover_quit_1(true)
+		end
+	else
+		if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			if quit_hovered == 1 then
+				back_to_title()
+			elseif quit_hovered == 2 then
+				quit()
+			end
+		elseif action_id == hash("b") and action.pressed then
+			go_from_page_to_tabs()
+			unhover_quit()
+		elseif action_id == hash("up") then
+			if action.pressed then
+				hover_quit_1()
+			end
+		elseif action_id == hash("down") then
+			if action.pressed then
+				hover_quit_2()
+			end
+		end
+	end
+end
+
+local function unhover_quit_title()
+	quit_title_hovered = false
+	local node = gui.get_node("button_quit_title_yes")
+	gui.animate(node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_quit_title_no")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+end
+
+local function hover_quit_title_yes(mute)
+	if quit_title_hovered == 1 then return end
+	quit_title_hovered = 1
+	local node = gui.get_node("button_quit_title_yes")
+	gui.animate(node, "color", vmath.vector3(1, 0, 0), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_quit_title_no")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	if not mute then
+		matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+	end
+end
+
+local function hover_quit_title_no(mute)
+	if quit_title_hovered == 2 then return end
+	quit_title_hovered = 2
+	local node = gui.get_node("button_quit_title_no")
+	gui.animate(node, "color", vmath.vector3(1, 0, 0), gui.EASING_INOUTSINE, 0.2)
+	local other_node = gui.get_node("button_quit_title_yes")
+	gui.animate(other_node, "color", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.2)
+	if not mute then
+		matchanovel.post("sound", "play_sfx", {id = "menu_tab_activated"})
+	end
+end
+
+local function input_quit_title(action_id, action)
+	if (action_id == hash("touch") or action_id == hash("middle")) then
+		if action.released then
+			if gui.pick_node(gui.get_node("button_quit_title_yes"), action.x, action.y) then
+				quit()
+			elseif gui.pick_node(gui.get_node("button_quit_title_no"), action.x, action.y) then
+				active_menu = "title"
+				hide_page()
+			end
+		end
+	end
+	if using_buttons_for_tabs then
+		if action_id == hash("right") and action.pressed then
+			go_from_tab_to_page()
+			hover_quit_title_yes(true)
+		elseif (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			go_from_tab_to_page()
+			hover_quit_title_yes(true)
+		end
+	else
+		if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			if quit_title_hovered == 1 then
+				quit()
+			elseif quit_title_hovered == 2 then
+				active_menu = "title"
+				hide_page()
+				go_from_page_to_tabs()
+			end
+		elseif action_id == hash("b") and action.pressed then
+			go_from_page_to_tabs()
+			unhover_quit_title()
+		elseif action_id == hash("left") then
+			if action.pressed then
+				hover_quit_title_yes()
+			end
+		elseif action_id == hash("right") then
+			if action.pressed then
+				hover_quit_title_no()
+			end
+		end
+	end
+end
+
+local function input_log(action_id, action)
+	if not action_id then
+		if pressed_log_slider_button then
+			move_log_slider(action.screen_dy)
+		elseif scrolling_log then
+			scroll_log_by(action.screen_dy)
+		end
+	elseif action_id == hash("touch") then
+		if action.pressed then
+			if gui.pick_node(gui.get_node("log_slider_button"), action.x, action.y) then
+				pressed_log_slider_button = true
+			elseif gui.pick_node(gui.get_node("log_slider_back"), action.x, action.y) then
+				if action.screen_y > gui.get_screen_position(gui.get_node("log_slider_button")).y then
+					log_back()
+				else
+					log_forward()
+				end
+			elseif not gui.pick_node(gui.get_node("tabs_area"), action.x, action.y) then
+				scrolling_log = true
+			end
+		elseif action.repeated then
+			if not scrolling_log and not pressed_log_slider_button then 
+				if gui.pick_node(gui.get_node("log_slider_back"), action.x, action.y) then
+					if gui.pick_node(gui.get_node("log_slider_button"), action.x, action.y) then
+						pressed_log_slider_button = true
+					else
+						if action.screen_y > gui.get_screen_position(gui.get_node("log_slider_button")).y then
+							log_back()
+						else
+							log_forward()
+						end
+					end
+				end
+			end
+		elseif action.released then
+			pressed_log_slider_button = false
+			scrolling_log = false
+		end
+	elseif action_id == hash("back") then
+		if action.repeated then
+			log_back()
+		end
+	elseif action_id == hash("forward") then
+		if action.repeated then
+			log_forward()
+		end
+	elseif action_id == hash("end") then
+		log_newest()
+	elseif action_id == hash("home") then
+		log_oldest()
+	end
+
+	if using_buttons_for_tabs then
+		if action_id == hash("right") and action.pressed then
+			go_from_tab_to_page()
+		elseif (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+			go_from_tab_to_page()
+		end
+	else
+		if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+		elseif (action_id == hash("b") or action_id == hash("left")) and action.pressed then
+			go_from_page_to_tabs()
+		elseif action_id == hash("up") then
+			if action.repeated then
+				log_back()
+			end
+		elseif action_id == hash("down") then
+			if action.repeated then
+				log_forward()
+			end
+		end
+	end
+end
+
+local function input_start(action_id, action)
+	if (action_id == hash("a") or action_id == hash("continue") or action_id == hash("enter")) and action.pressed then
+		start()
 	end
 end
 
 function on_input(self, action_id, action)
+	if action_id == hash("touch") then
+		if action.pressed then
+			touch_distance = 0
+			touch_distance_max_reached = false
+		elseif action.released then
+			touch_distance = 0
+			touch_distance_max_reached = false
+		elseif not touch_distance_max_reached then
+			touch_distance = touch_distance + math.abs(action.dx)
+			touch_distance = touch_distance + math.abs(action.dy)
+		end
+	end
+	if not touch_distance_max_reached and touch_distance > touch_distance_max then
+		touch_distance_max_reached = true
+		unhover_save()
+		unpress_save()
+	end
+
 	if action_id == hash("fullscreen") and action.pressed then
 		toggle_fullscreen()
 		--pick_option(group, option)
 	end
+
+	if action_id == hash("screenshot") and action.pressed then
+		save.screenshot()
+	end
+
+	if action_id == hash("escape") and action.pressed then
+		if defos and defos.is_fullscreen() then
+			pick_option(3, 2)
+		end
+	end
+
+	
+
+	if starting then
+		if action_id == hash("touch") or action_id == hash("middle") or action_id == hash("continue") or action_id == hash("a") then
+			if action.pressed then
+				pressing_title = true
+				matchanovel.post("sound", "play_sfx", {id = "menu_save_press"})
+			elseif pressing_title and action.released then
+				show_tabs(0.5)
+				starting = false
+				active = true
+				pressing_title = false
+				selected_tab = false
+				matchanovel.post("sound", "play_sfx", {id = "menu_save_release"})
+				use_buttons()
+			end
+		end
+		return true
+	end
 	
 	if active then
-		if action_id == HASH_MENU and action.pressed then
-			hide_menu()
+		if pause then
+			if action_id == hash("menu") and action.pressed then
+				hide_menu()
+			end
+		end
+
+		if not action_id then
+			local hovered
+			for k, tab in pairs(tabs) do
+				--print(k, tab)
+				local text_node = gui.get_node("tab_area_"..k)
+				if gui.pick_node(text_node, action.x, action.y) then
+					hovered = true
+					highlight_tab(k)
+				end
+			end
+			if highlight and not hovered then
+				gui.animate(gui.get_node("tab_highlight"), "color.w", 0, gui.EASING_LINEAR, 0.2)
+				highlight = false
+			end
+
+			
 		end
 		
-		if active_menu == "settings" then
-			if action_id == HASH_TOUCH then
-				if action.pressed then
-					if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
-						for i = 1, #sliders do
-							if gui.pick_node(gui.get_node("slider_empty_"..i), action.x, action.y) then
-								pressed_slider = i
-								break
-							end
-							if gui.pick_node(gui.get_node("arrow_left_"..i), action.x, action.y) then
-								pressed_slider_arrow = i
-								slider_minus(i)
-								break
-							end
-							if gui.pick_node(gui.get_node("arrow_right_"..i), action.x, action.y) then
-								pressed_slider_arrow = i
-								slider_plus(i)
-								break
-							end
-						end
-						for k, v in pairs(option_names) do
-							for i = 1, #options[v] do
-								if gui.pick_node(gui.get_node("button_"..k.."_"..i), action.x, action.y) then
-									pick_option(k, i)
-									pressed_option = k
-									break
-								end
-							end
-						end
-						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then 
-							pressed = "okay"
-						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then 
-							pressed = "okay"
-						end
+		if (action_id == hash("touch") or action_id == hash("middle")) and action.pressed then
+			for k, tab in pairs(tabs) do
+				if gui.pick_node(gui.get_node("tab_area_"..k), action.x, action.y) then
+					press_tab(k, true)
+				end
+			end
+		end
 
-					else
-						pressed = "outside_menu"
-					end
-				elseif action.repeated then
-					if pressed_slider_arrow then 
-						if gui.pick_node(gui.get_node("arrow_left_"..pressed_slider_arrow), action.x, action.y) then
-							slider_minus(pressed_slider_arrow)
-						elseif gui.pick_node(gui.get_node("arrow_right_"..pressed_slider_arrow), action.x, action.y) then
-							slider_plus(pressed_slider_arrow)
-						end
-					end
-				elseif action.released then
-					if pressed and pressed == "outside_menu" then 
-						if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
-							--hide_menu()
-							msg.post("#", "hide_menu")
-						end
-					elseif pressed and pressed == "okay" then 
-						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then
-							hide_menu()
-						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then
-							hide_menu()
-						end
-					end
-					pressed = false
-					pressed_slider = false
-					pressed_option = false
-					pressed_slider_arrow = false
+		if action_id == hash("back") and action.repeated then
+			if gui.pick_node(gui.get_node("tabs_area"), action.x, action.y) then
+				tab_up(true)
+				return true
+			end
+		end
+
+		if action_id == hash("forward") and action.repeated then
+			if gui.pick_node(gui.get_node("tabs_area"), action.x, action.y) then
+				tab_down(true)
+				return true
+			end
+		end
+		
+		if using_buttons_for_tabs then
+			if action_id == hash("up") and action.repeated then
+				tab_up(false)
+				return true
+			end
+			if action_id == hash("down") and action.repeated then
+				tab_down(false)
+				return true
+			end
+			if (action_id == hash("continue") or action_id == hash("a")) and action.pressed then
+				if selected_tab then
+					--press_tab(selected_tab, true)
 				else
-					if pressed_slider then
-						set_slider(pressed_slider, action.screen_x)
-					elseif pressed_option then
-						local name = option_names[pressed_option]
-						for i = 1, #options[name] do
-							if gui.pick_node(gui.get_node("button_"..pressed_option.."_"..i), action.x, action.y) then
-								pick_option(pressed_option, i)
-								break
-							end
-						end
+					select_tab(1)
+					return true
+				end
+				--return true
+			end
+			if action_id == hash("b") and action.pressed then
+				if pause then
+					hide_menu()
+					return true
+				end
+			end
+		elseif using_buttons_for_page then
+			if action.pressed then
+				if active_menu == "log" then
+					if action_id == hash("b") then
+						back_to_tab_select()
+					end
+				elseif active_menu == "save" or active_menu == "load" then
+					if action_id == hash("b") then
+						back_to_tab_select()
+					end
+				elseif active_menu == "settings" then
+					if action_id == hash("b") then
+						back_to_tab_select()
+					end
+				elseif active_menu == "quit" then
+					if action_id == hash("b") then
+						back_to_tab_select()
+					end
+				elseif active_menu == "quit_title" then
+					if action_id == hash("b") then
+						back_to_tab_select()
 					end
 				end
 			end
+		end
+
+		if active_menu == "settings" then
+			input_settings(action_id, action)
 		elseif active_menu == "save" or active_menu == "load" then 
-			if not action_id then
-				if save_hovered then
-					local node = gui.get_node("save_"..save_hovered)
-					if not gui.pick_node(node, action.x, action.y) then
-						local alpha = 0.3
-						if save_written[save_hovered] then 
-							alpha = 0.75
-						end
-						gui.animate(node, "color.w", alpha, gui.EASING_INOUTSINE, 0.25)
-						save_hovered = false
-					end 
-				end
-				if not save_hovered and not pressed_save then
-					for i = 1, 4 do
-						local node = gui.get_node("save_"..i)
-						if gui.pick_node(node, action.x, action.y) then
-							save_hovered = i
-							local alpha = 0.8
-							if save_written[i] then 
-								alpha = 0.95
-							end
-							gui.animate(node, "color.w", alpha, gui.EASING_INOUTSINE, 0.25)
-						end
-					end
-				end
-			elseif action_id == HASH_TOUCH then
-				if action.pressed then
-					if gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
-						for i = 1, 4 do
-							local node = gui.get_node("save_"..i)
-							if gui.pick_node(node, action.x, action.y) then
-								pressed_save = i
-								gui.animate(node, "scale", vmath.vector3(0.8, 0.8, 1), gui.EASING_INOUTSINE, 0.15)
-							end
-						end
-						if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then 
-							pressed = "okay"
-						elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then 
-							pressed = "okay"
-						elseif gui.pick_node(gui.get_node("page_right"), action.x, action.y) then 
-							pressed = "page_right"
-						elseif gui.pick_node(gui.get_node("page_left"), action.x, action.y) then 
-							pressed = "page_left"							
-						end
-					else
-						pressed = "outside_menu"
-					end
-				elseif action.released then
-					if pressed_save then 
-						local node = gui.get_node("save_"..pressed_save)
-						if gui.pick_node(node, action.x, action.y) then
-							if active_menu == "save" then
-								write_save(pressed_save)
-							else
-								load_save(pressed_save)
-							end
-						end
-						gui.animate(node, "scale", vmath.vector3(1, 1, 1), gui.EASING_INOUTSINE, 0.25)
-					elseif pressed then
-						if pressed == "outside_menu" then 
-							if not gui.pick_node(gui.get_node("menu_back"), action.x, action.y) then
-								msg.post("#", "hide_menu")
-							end
-						elseif pressed == "okay" then 
-							if gui.pick_node(gui.get_node("box_okay"), action.x, action.y) then
-								hide_menu()
-							elseif gui.pick_node(gui.get_node("box_okay_left"), action.x, action.y) then
-								hide_menu()
-							end
-						elseif pressed == "page_right" then
-							if gui.pick_node(gui.get_node("page_right"), action.x, action.y) then
-								save_page_forward()
-							end
-						elseif pressed == "page_left" then
-							if gui.pick_node(gui.get_node("page_left"), action.x, action.y) then
-								save_page_back()
-							end
-						end
-					end
-					pressed = false
-					pressed_slider = false
-					pressed_option = false
-					pressed_slider_arrow = false
-					pressed_save = false
-				end
-			elseif action_id == HASH_BACK then
-				if action.repeated then
-					save_page_back()
-				end
-			elseif action_id == HASH_FORWARD then
-				if action.repeated then
-					save_page_forward()
-				end
-			end
+			input_save(action_id, action)
+		elseif active_menu == "quit" then 
+			input_quit(action_id, action)
+		elseif active_menu == "quit_title" then 
+			input_quit_title(action_id, action)
+		elseif active_menu == "log" then
+			input_log(action_id, action)
+		elseif active_menu == "continue" then
+			input_continue(action_id, action)
+		elseif active_menu == "start" then
+			input_start(action_id, action)
 		end
 			
 		
 		return true
 	else
-		if action_id == HASH_MENU and action.pressed then
-			show_settings()
-			--show_save()
+		if not title and not pause and action.pressed then
+			if action_id == hash("menu") then
+				show_pause_menu()
+				show_page()
+				if action.gamepad then
+					use_buttons()
+				end
+			elseif action_id == hash("b") then
+				show_pause_menu()
+				show_page()
+				use_buttons()
+			end
 		end
 	end
-
-	
 end

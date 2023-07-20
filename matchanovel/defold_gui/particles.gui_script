@@ -1,0 +1,98 @@
+local save = require "matchanovel.save"
+local colors = require "matchanovel.colors"
+
+-- Weather
+
+local function clear_weather()
+	gui.stop_particlefx(gui.get_node("weather_particles"), { clear = true })
+	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+end
+
+local function stop_weather()
+	gui.stop_particlefx(gui.get_node("weather_particles"))
+	gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+end
+
+local function start_fog()
+	gui.animate(gui.get_node("weather_color"), "color.w", 0.5, gui.EASING_INOUTSINE, 3, 0, start_fog, gui.PLAYBACK_LOOP_PINGPONG)
+end
+
+
+local function change_weather(weather)
+	local node = gui.get_node("weather_particles")
+	gui.stop_particlefx(node)
+	gui.set_particlefx(node, weather)
+	gui.play_particlefx(node)
+	if weather == "blizzard" then
+		gui.animate(gui.get_node("weather_color"), "color.w", 0.3, gui.EASING_INOUTSINE, 0.2, 0, start_fog)
+	else
+		gui.animate(gui.get_node("weather_color"), "color.w", 0, gui.EASING_INOUTSINE, 0.2)
+	end
+end
+
+local has_front_particles = {
+}
+
+local function stop_weather_front()
+	msg.post("particles_front", "stop_weather")
+end
+
+local function clear_weather_front()
+	msg.post("particles_front", "clear_weather")
+end
+
+local function change_weather_front(weather)
+	msg.post("particles_front", "change_weather_front", {weather = weather})
+end
+
+local function set_weather(weather)
+	if weather == "none" then
+		stop_weather()
+		stop_weather_front()
+	elseif weather == "clear" then
+		clear_weather()
+		clear_weather_front()
+	elseif weather then 
+		change_weather(weather)
+		if has_front_particles[weather] then
+			change_weather_front(weather)
+		end
+	end
+end
+
+
+
+function init(self)
+end
+
+function update(self, dt)
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("action_set") then 
+		if message.name == "scene.weather" then
+			set_weather(message.value or message.value_string)
+		end
+	elseif message_id == hash("set_weather") then 
+		set_weather(message.value or message.value_string)
+	elseif message_id == hash("change_weather_front") then
+		change_weather(message.weather)
+	elseif message_id == hash("stop_weather") then
+		stop_weather()
+	elseif message_id == hash("clear_weather") then
+		clear_weather()
+	elseif message_id == hash("set_render_order") then 
+		gui.set_render_order(message.n)
+	elseif message_id == hash("loaded") then
+		local weather = save.get_var("scene.weather")
+		if weather then 
+			set_weather(weather)
+		else
+			clear_weather()
+			clear_weather_front()
+		end
+	elseif message_id == hash("unload") then
+		clear_weather()
+		clear_weather_front()
+	end
+end

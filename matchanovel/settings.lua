@@ -2,10 +2,11 @@ local files = require "matchanovel.engine.defold.filesys"
 
 local M = {}
 
-local app_id = "Untitled MatchaNovel project"
+local app_id = "MatchaNovel demo 0.2"
 local file = "settings.ini"
 local filename = files.get_save_file(app_id, file)
 
+local initialized = false
 local settings_update = false
 local checking_updates = true
 local LB = "\r\n"
@@ -103,6 +104,7 @@ function M.check_updates()
 end
 
 function M.init()
+	if initialized then return end
 	if file_exists(filename) then 
 		read_settings()
 	else
@@ -117,6 +119,7 @@ function M.init()
 			defos.set_fullscreen(true)
 		end
 	end
+	initialized = true
 end
 
 function M.calc_text_speed(value)
@@ -163,6 +166,13 @@ end
 function M.open_folder()
 	files.open_folder(app_id)
 end
+
+function M.get_variable(name)
+	--print(name, M.get(name), M.get(name) or false)
+	return M.get(name) or false
+end
+
+
 
 M.set_default("text_speed", 50)
 M.set_default("auto_speed", 50)

@@ -16,6 +16,7 @@ M.is_mobile = M.is_android or M.is_ios
 M.language = sys_info.language
 M.is_debug  = engine_info.is_debug
 M.engine_version  = engine_info.version
+M.engine = "Defold"
 
 
 local function get_time()
@@ -51,17 +52,56 @@ function M.get(name)
 		return os.date("%S")
 	elseif name == "time_weekday" then 
 		return os.date("%w")
+	elseif name == "time_hour12" then
+		local time_hour = os.date("%H")
+		local time_hour_number = tonumber(time_hour)
+		if time_hour_number == 0  then
+			return "12"
+		elseif time_hour_number < 13  then
+			return time_hour
+		else
+			return tostring(time_hour_number - 12)
+		end  
+		return os.date("%H") % 12
+	elseif name == "time_ampm" then
+		if tonumber(os.date("%H")) < 12  then
+			return "a.m."
+		else
+			return "p.m."
+		end 
 	elseif name == "os_clock" then 
 		return os.clock()
 	elseif name == "is_fullscreen" then 
-		return defos.is_fullscreen()
+		return defos == true and defos.is_fullscreen()
 	--elseif name == "mouse_x" then 
 	--elseif name == "mouse_y" then
 	end
 end
 
-function M.exit()
-	sys.exit(0)
+function M.open_url(url, target, name)
+	sys.open_url(url, {target = target, name = name})
+end
+
+function M.set_window_title(title)
+	if defos and title then
+		defos.set_window_title(tostring(title))
+	end
+end
+
+function M.maximize()
+	if defos then
+		defos.set_maximized(true)
+	end
+end
+
+function M.minimize()
+	if defos then
+		defos.minimize()
+	end
+end
+
+function M.exit(code)
+	sys.exit(code or 0)
 end
 
 return M

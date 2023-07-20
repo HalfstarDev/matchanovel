@@ -205,20 +205,23 @@ end
 local function press_button(i)
 	local button = buttons[i]
 	if button == "settings" then
-		msg.post("menu#menu", "show_settings")
+		matchanovel.post("textbox", "end_skip")
+		matchanovel.post("menu", "show_settings")
 		matchanovel.showing_menu = true
 	elseif button == "skip" then
-		msg.post("textbox#textbox", "skip_button")
+		matchanovel.post("textbox", "skip_button")
 	elseif button == "auto" then
-		msg.post("textbox#textbox", "auto_button")
+		matchanovel.post("textbox", "auto_button")
 	elseif button == "qsave" then
 		matchanovel.quicksave()
 	elseif button == "qload" then
 		matchanovel.quickload()
 	elseif button == "save" then
-		msg.post("menu#menu", "show_save")
+		matchanovel.post("textbox", "end_skip")
+		matchanovel.post("menu", "show_save")
 	elseif button == "load" then
-		msg.post("menu#menu", "show_load")
+		matchanovel.post("textbox", "end_skip")
+		matchanovel.post("menu", "show_load")
 	elseif button == "lock" then
 		toggle_lock()
 	end
@@ -230,8 +233,10 @@ end
 
 function init(self)
 	msg.post("window_listener#window_listener", "add_listener")
+	settings.init()
 	create_buttons()
 	load_lock()
+	gui.set_enabled(gui.get_node("quickmenu"), false)
 end
 
 function update(self, dt)
@@ -241,7 +246,11 @@ function update(self, dt)
 end
 
 function on_message(self, message_id, message, sender)
-	if message_id == hash("set_font") then 
+	if message_id == hash("show") then 
+		gui.set_enabled(gui.get_node("quickmenu"), true)
+	elseif message_id == hash("hide") then
+		gui.set_enabled(gui.get_node("quickmenu"), false)
+	elseif message_id == hash("set_font") then
 		set_font(message.font)
 	elseif message_id == hash("activate_button") then
 		for k, name in pairs(buttons) do
@@ -257,11 +266,23 @@ function on_message(self, message_id, message, sender)
 				return
 			end
 		end
+	elseif message_id == hash("set_lock") then 
+		if message.lock then
+			lock = true
+			show()
+			lock_quickmenu()
+		else
+			lock = false
+			unlock_quickmenu()
+			hide()
+		end
+	elseif message_id == hash("unload") then
+		hide()
 	elseif message_id == hash("set_render_order") then 
 		gui.set_render_order(message.n)
 	elseif message_id == hash("event_window_resized") then 
-		zoom = message.zoom
-		create_buttons()
+		--zoom = message.zoom
+		--create_buttons()
 		--gui.set_scale(gui.get_node("quickmenu"), vmath.vector3(message.zoom, message.zoom, 1))
 	end	
 end
