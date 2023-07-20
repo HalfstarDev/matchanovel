@@ -3,7 +3,7 @@ local files = require "matchanovel.engine.defold.filesys"
 
 local M = {}
 
-local reader = false
+local reader = true
 
 local function load_data_from_engine_resource(filepath)
 	local data = sys.load_resource(filepath)
