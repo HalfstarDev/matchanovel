@@ -148,7 +148,7 @@ a: 97 * 63 + x = {97 * 63 + x}.
 a: Random number from 1 to 100: {math.random(1,100)}.
 a: You are running this demo on {system.name}.
 a: Is x larger than or equal to 9? {x >= 9 and "Yes" or "No"}.
-a: Turn all vowels in this sentence into stars: {string.gsub("Turn all vowels in this sentence into stars", "[AEIOUaeiou]", "*")}
+a: Turn all vowels into stars: {string.gsub("Turn all vowels into stars", "[AEIOUaeiou]", "*")}
 ```
 
 Additionally there are some operators that MatchNovel has that are not part of standard Lua:
