@@ -3,6 +3,7 @@ local settings = require "matchanovel.settings"
 local save = require "matchanovel.save"
 local theme = require "matchanovel.theme"
 local images = require "matchanovel.defold_gui.images"
+local system = require "matchanovel.engine.defold.system"
 
 
 local HASH_TOUCH = hash("touch")
@@ -64,12 +65,10 @@ local pressing_title = false
 local tab_lists = {
 	pause = {
 		"continue",
-		--"characters",
 		"log",
 		"save",
 		"load",
 		"settings",
-		--"extras",
 		"quit",
 	},
 	title = {
@@ -77,6 +76,22 @@ local tab_lists = {
 		"load",
 		"settings",
 		"quit_title",
+	}
+}
+
+local tab_lists_html = {
+	pause = {
+		"continue",
+		"log",
+		"save",
+		"load",
+		"settings",
+		"quit", -- change to back to title only
+	},
+	title = {
+		"start",
+		"load",
+		"settings",
 	}
 }
 
@@ -210,7 +225,13 @@ end
 
 local function set_tabs(id)
 	current_tab_list = id
-	local list = tab_lists[id]
+	local list
+	if tab_lists_html and tab_lists_html[id] and sys.get_sys_info().system_name == "HTML5" then
+		list = tab_lists_html[id]
+	else
+		list = tab_lists[id]
+	end
+	
 	for i = 1, #tabs do
 		gui.set_enabled(gui.get_node("tab_"..i), false)
 	end
@@ -702,6 +723,7 @@ local function show_page()
 		end
 		if active_menu == "settings" then
 			matchanovel.post("textbox", "show_above_menu")
+			--apply_fullscreen()
 		else
 			matchanovel.post("textbox", "show_below_menu")
 		end
@@ -1137,6 +1159,15 @@ local function pick_option(group, option)
 	apply_option(name, value)
 end
 
+local function apply_fullscreen()
+	print("apply_fullscreen")
+	if defos and defos.is_fullscreen() then
+		pick_option(3, 1)
+	else 
+		pick_option(3, 2)
+	end
+end
+
 local function toggle_fullscreen()
 	if defos and defos.is_fullscreen() then
 		pick_option(3, 2)
@@ -1323,8 +1354,8 @@ local function load_settings()
 	local volume_sound = settings.get("volume_sound")
 	local font = settings.get("font")
 	local fullscreen = settings.get("fullscreen")
-	local skip_all = settings.get("skip_all")	
-
+	local skip_all = settings.get("skip_all")
+	
 	set_slider_value(1, text_speed/100, false)
 	set_slider_value(2, auto_speed/100, false)
 	set_slider_value(3, volume_music/100, false)
