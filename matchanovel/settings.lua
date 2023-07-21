@@ -1,4 +1,5 @@
 local files = require "matchanovel.engine.defold.filesys"
+local system = require "matchanovel.engine.defold.system"
 
 local M = {}
 
@@ -57,6 +58,9 @@ local function read_settings()
 			val = string_to_value(val)
 			setting_value[name] = val
 		end
+	end
+	if system.is_html then
+		setting_value.fullscreen = false
 	end
 end
 
@@ -182,5 +186,11 @@ M.set_default("font", "serif")
 M.set_default("fullscreen", true)
 M.set_default("skip_all", false)
 M.set_default("lock", true)
+
+if system.is_html then
+	M.set_default("fullscreen", false)
+else
+	M.set_default("fullscreen", true)
+end
 
 return M
