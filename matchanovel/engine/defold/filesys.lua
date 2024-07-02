@@ -6,15 +6,25 @@ local load_file = sys.load
 local save_file = sys.save
 local open_url = sys.open_url
 
+-- path separator character for current OS
+local SEP = package.config:sub(1,1)
+
+local function get_path(path)
+	return string.gsub(path, "[/\\]", SEP)
+end
+
 function M.load_file(filename)
+	filename = get_path(filename)
 	return load_file(filename)
 end
 
 function M.save_file(filename, table)
+	filename = get_path(filename)
 	return save_file(filename, table)
 end
 
 function M.write_binary(filename, data)
+	filename = get_path(filename)
 	local file = io.open(filename, "wb")
 	file:write(data)
 	file:flush()
@@ -22,6 +32,7 @@ function M.write_binary(filename, data)
 end
 
 function M.read_binary(filename)
+	filename = get_path(filename)
 	local file = io.open(filename, "rb")
 	if file then
 		local s = file:read("*a")
@@ -31,14 +42,20 @@ function M.read_binary(filename)
 end
 
 function M.does_file_exist(filename)
-	local file = io.open(filename, "r")
-	if file then
-		file:close()
-		return true
+	filename = get_path(filename)
+	if sys.exists then
+		return sys.exists(filename)
+	else
+		local file = io.open(filename, "r")
+		if file then
+			file:close()
+			return true
+		end
 	end
 end
 
 function M.load_script(filename)
+	filename = get_path(filename)
 	local loaded = {}
 	local external = file_exists("."..filename)
 	if external then
@@ -64,8 +81,9 @@ function M.load_script(filename)
 	return loaded
 end
 
-function M.get_save_file(application_id, file_name)
-	return get_save_file(application_id, file_name)
+function M.get_save_file(application_id, filename)
+	filename = get_path(filename)
+	return get_save_file(application_id, filename)
 end
 
 function M.open_folder(application_id)

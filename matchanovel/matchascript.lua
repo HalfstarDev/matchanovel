@@ -18,7 +18,7 @@ local define = true
 --local definition = require "matchanovel.matchascript_novel"
 local definition
 
-local scripts_folder = "\\assets\\scripts\\"
+local scripts_folder = "/assets/scripts/"
 
 
 function file_exists(name)
