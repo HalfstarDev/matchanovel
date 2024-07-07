@@ -138,16 +138,21 @@ function M.set_node_to_thumbnail(node_id, slot)
 		end
 	end
 	local loaded_screenshot = loaded_screenshots[slot]
-	if loaded_screenshot then
+	if loaded_screenshot and loaded_screenshot ~= "" then
 		local node = gui.get_node(node_id)
 		set_node_to_png_buffer(node, loaded_screenshot, node_id)
+		return true
+	else
+		return false
 	end
 end
 
 function M.save_cached_screenshot(slot)
-	local filename = save.get_path(slot, nil, nil, "png")
-	files.write_binary(filename, cached_screenshot)
-	loaded_screenshots[slot] = cached_screenshot
+	if cached_screenshot then
+		local filename = save.get_path(slot, nil, nil, "png")
+		files.write_binary(filename, cached_screenshot)
+		loaded_screenshots[slot] = cached_screenshot
+	end
 end
 
 

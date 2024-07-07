@@ -1203,7 +1203,14 @@ local function show_slot_as_written(page_slot, text)
 	end
 	--gui.play_flipbook(gui.get_node("save_"..page_slot.."/thumbnail"), "thumbnail")
 	gui.set_enabled(gui.get_node("save_"..page_slot.."/thumbnail"), true)
-	images.set_node_to_thumbnail("save_"..page_slot.."/thumbnail", slot)
+	local node_id = "save_"..page_slot.."/thumbnail"
+	local node = gui.get_node(node_id)
+	local thumbnail_loaded = images.set_node_to_thumbnail(node_id, slot)
+	if thumbnail_loaded then
+		gui.set_color(node, vmath.vector3(1, 1, 1))
+	else
+		gui.set_color(node, vmath.vector3(0.5, 0.5, 0.5))
+	end
 	--gui.animate(gui.get_node("save_"..page_slot.."/slot"), "color.w", 0.95, gui.EASING_INOUTSINE, 0.25)
 end
 
