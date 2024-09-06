@@ -16,7 +16,7 @@ package = com.halfstaratelier.matchanovel
 [project]
 title = MatchaNovel
 version = 0.1
-custom_resources = matchanovel/defold_gui/example/assets
+custom_resources = assets, matchanovel/defold_gui/example/assets
 
 [sprite]
 max_count = 512
